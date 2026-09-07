@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Globe2, Heart, Menu, Search, SlidersHorizontal, Star, Users, X } from 'lucide-react'
-import { api, type AdminStats, type Booking, type Property, type Review, type User, type UserRole } from '@/lib/api'
+import { api, type AdminStats, type Booking, type Property, type PropertyType, type Review, type User, type UserRole } from '@/lib/api'
 
 const fallback: Property[] = [
  { id:'1', title:'Casa de diseño frente al lago', city:'Villa La Angostura', country:'Argentina', pricePerNight:184, maxGuests:6, bedrooms:3, bathrooms:2, propertyType:'HOUSE', description:'Casa equipada para descansar frente al lago.', images:[{imageUrl:'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
@@ -258,7 +258,7 @@ export default function Page() {
   <footer id="anfitriones" className="border-t border-border"><div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:px-10"><b className="text-foreground">genesis.</b><span>© 2026 Genesis Rentals</span><button onClick={()=>setHost(true)} className="font-medium text-foreground hover:text-primary">Convertite en anfitrión</button></div></footer>
   {selected&&<PropertyModal property={selected} user={user} token={token} checkIn={checkIn} checkOut={checkOut} guests={guests} onClose={()=>setSelected(null)} onAuth={()=>setAuth(true)} onNotice={setNotice}/>} 
   {auth&&<AuthModal onClose={()=>setAuth(false)} onLogin={(session)=>{saveSession(session);setAuth(false)}}/>}
-  {host&&<HostModal onClose={()=>setHost(false)} user={user} token={token} onAuth={()=>setAuth(true)} onCreated={(p)=>{setProperties(list=>[p,...list]);setNotice('Alojamiento publicado correctamente.')}}/>}
+  {host&&<HostModal onClose={()=>setHost(false)} user={user} token={token} onAuth={()=>setAuth(true)} onCreated={(p)=>{setProperties(list=>[p,...list]); setNotice('¡Tu alojamiento fue publicado correctamente!')}}/>}
   {bookingsOpen&&<BookingsModal onClose={()=>setBookingsOpen(false)} token={token} onAuth={()=>setAuth(true)}/>} 
   {adminOpen&&<AdminModal onClose={()=>setAdminOpen(false)} token={token} user={user}/>} 
  </main>
@@ -280,7 +280,155 @@ function PropertyModal({property,user,token,checkIn,checkOut,guests,onClose,onAu
 
 function AuthModal({onClose,onLogin}:{onClose:()=>void;onLogin:(s:Session)=>void}){const [mode,setMode]=useState<'login'|'register'>('login'),[name,setName]=useState(''),[email,setEmail]=useState('guest@genesis.com'),[password,setPassword]=useState('Password123!'),[error,setError]=useState(''),[busy,setBusy]=useState(false);async function submit(){setBusy(true);setError('');try{const r=mode==='login'?await api.login({email,password}):await api.register({name,email,password});onLogin({token:r.accessToken,user:r.user})}catch(error){setError(message(error))}finally{setBusy(false)}}return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/40 p-5"><div className="w-full max-w-md rounded-3xl bg-card p-7"><div className="flex justify-between"><div><p className="text-sm font-semibold text-primary">Bienvenido a genesis.</p><h2 className="mt-1 text-2xl font-semibold">{mode==='login'?'Iniciá sesión':'Creá tu cuenta'}</h2></div><button onClick={onClose}><X/></button></div><div className="mt-6 flex flex-col gap-4">{mode==='register'&&<label className="text-sm font-medium">Nombre<input value={name} onChange={e=>setName(e.target.value)} className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>}<label className="text-sm font-medium">Email<input value={email} onChange={e=>setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" type="email"/></label><label className="text-sm font-medium">Contraseña<input value={password} onChange={e=>setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" type="password"/></label>{error&&<p className="text-sm text-destructive">{error}</p>}<button disabled={busy} onClick={submit} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-60">{busy?'Conectando...':'Continuar'}</button><button onClick={()=>setMode(mode==='login'?'register':'login')} className="text-center text-sm text-muted-foreground hover:text-foreground">{mode==='login'?'Crear cuenta':'Ya tengo cuenta'}</button><p className="text-center text-xs text-muted-foreground">Demo API: guest@genesis.com · Password123!</p></div></div></div>}
 
-function HostModal({onClose,user,token,onAuth,onCreated}:{onClose:()=>void;user:User|null;token:string;onAuth:()=>void;onCreated:(p:Property)=>void}){const [form,setForm]=useState({title:'',city:'',country:'Argentina',pricePerNight:'',maxGuests:'2'}),[error,setError]=useState(''),[busy,setBusy]=useState(false);async function submit(){if(!user){onAuth();return}if(user.role!=='HOST'&&user.role!=='ADMIN'){setError('Necesitás una cuenta HOST para publicar un alojamiento.');return}setBusy(true);setError('');try{const p=await api.createProperty(token,{title:form.title,description:'Alojamiento publicado desde Genesis Rentals.',propertyType:'HOUSE',city:form.city,country:form.country,address:form.city,latitude:0,longitude:0,pricePerNight:Number(form.pricePerNight),maxGuests:Number(form.maxGuests),bedrooms:1,bathrooms:1});onCreated(p);onClose()}catch(error){setError(message(error))}finally{setBusy(false)}}return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/40 p-5"><div className="w-full max-w-lg rounded-3xl bg-card p-7"><div className="flex justify-between"><div><p className="text-sm font-semibold text-primary">Para anfitriones</p><h2 className="mt-1 text-2xl font-semibold">Publicá tu espacio</h2></div><button onClick={onClose}><X/></button></div>{!user?<p className="mt-6 rounded-xl bg-secondary p-4 text-sm">Iniciá sesión con una cuenta HOST para publicar un alojamiento.</p>:<div className="mt-6 flex flex-col gap-4"><input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Título del alojamiento" className="rounded-xl border border-input bg-background px-4 py-3"/><input value={form.city} onChange={e=>setForm({...form,city:e.target.value})} placeholder="Ciudad" className="rounded-xl border border-input bg-background px-4 py-3"/><div className="grid grid-cols-2 gap-3"><input value={form.pricePerNight} onChange={e=>setForm({...form,pricePerNight:e.target.value})} placeholder="Precio por noche" className="rounded-xl border border-input bg-background px-4 py-3"/><input value={form.maxGuests} onChange={e=>setForm({...form,maxGuests:e.target.value})} placeholder="Máximo de huéspedes" className="rounded-xl border border-input bg-background px-4 py-3"/></div>{error&&<p className="text-sm text-destructive">{error}</p>}<button disabled={busy} onClick={submit} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-60">{busy?'Guardando...':'Guardar alojamiento'}</button></div>}</div></div>}
+const propertyTypeOptions: { value: PropertyType; label: string }[] = [
+  { value: 'APARTMENT', label: 'Departamento' },
+  { value: 'HOUSE', label: 'Casa' },
+  { value: 'ROOM', label: 'Habitación' },
+  { value: 'HOTEL', label: 'Hotel' },
+  { value: 'OTHER', label: 'Otro' },
+]
+
+const emptyPropertyForm: {
+  title: string
+  description: string
+  propertyType: PropertyType | ''
+  city: string
+  country: string
+  address: string
+  pricePerNight: string
+  maxGuests: string
+  bathrooms: string
+  bedrooms: string
+} = {
+  title: '',
+  description: '',
+  propertyType: '',
+  city: '',
+  country: '',
+  address: '',
+  pricePerNight: '',
+  maxGuests: '',
+  bathrooms: '',
+  bedrooms: '',
+}
+
+type PropertyFormState = typeof emptyPropertyForm
+
+function isPositiveIntegerString(value: string) {
+  const trimmed = value.trim()
+  return trimmed !== '' && /^\d+$/.test(trimmed) && Number(trimmed) > 0
+}
+
+function validatePropertyForm(form: PropertyFormState) {
+  const errors: Partial<Record<keyof PropertyFormState, string>> = {}
+  const requiredText = ['title', 'description', 'city', 'country', 'address'] as const
+
+  requiredText.forEach((field) => {
+    const value = form[field].trim()
+    if (!value) {
+      errors[field] = 'Este campo es obligatorio.'
+    }
+  })
+
+  if (!form.propertyType || !propertyTypeOptions.some((option) => option.value === form.propertyType)) {
+    errors.propertyType = 'Seleccioná un tipo de propiedad válido.'
+  }
+
+  const numericFields = [
+    { key: 'pricePerNight', label: 'Precio por noche' },
+    { key: 'maxGuests', label: 'Máximo de huéspedes' },
+    { key: 'bathrooms', label: 'Baños' },
+    { key: 'bedrooms', label: 'Piezas' },
+  ] as const
+
+  numericFields.forEach(({ key }) => {
+    const raw = form[key].trim()
+    if (!raw) {
+      errors[key] = 'Este campo es obligatorio.'
+      return
+    }
+
+    const value = Number(raw)
+    if (!Number.isFinite(value) || value <= 0) {
+      errors[key] = 'Debe ser un número positivo.'
+      return
+    }
+
+    if (key === 'maxGuests' || key === 'bedrooms' || key === 'bathrooms') {
+      if (!Number.isInteger(value)) {
+        errors[key] = 'Solo se aceptan enteros. Ingresá nuevamente.'
+        return
+      }
+    }
+
+    if (key === 'bathrooms' || key === 'bedrooms') {
+      if (!isPositiveIntegerString(raw)) {
+        errors[key] = 'Solo se aceptan enteros positivos. Ingresá nuevamente.'
+      }
+    }
+  })
+
+  return errors
+}
+
+function HostModal({onClose,user,token,onAuth,onCreated}:{onClose:()=>void;user:User|null;token:string;onAuth:()=>void;onCreated:(p:Property)=>void}){
+  const [form,setForm]=useState<PropertyFormState>({...emptyPropertyForm})
+  const [errors,setErrors]=useState<Partial<Record<keyof PropertyFormState, string>>>({})
+  const [error,setError]=useState('')
+  const [busy,setBusy]=useState(false)
+
+  function updateField(field: keyof PropertyFormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }))
+    setErrors((current) => ({ ...current, [field]: undefined }))
+  }
+
+  function resetForm() {
+    setForm({ ...emptyPropertyForm })
+    setErrors({})
+    setError('')
+  }
+
+  async function submit(){
+    if(!user){ onAuth(); return }
+    if(user.role!=='HOST'&&user.role!=='ADMIN'){ setError('Necesitás una cuenta HOST para publicar un alojamiento.'); return }
+
+    const nextErrors = validatePropertyForm(form)
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      setError('Revisá los campos marcados antes de publicar.')
+      return
+    }
+
+    setBusy(true)
+    setError('')
+
+    try {
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        propertyType: form.propertyType as PropertyType,
+        city: form.city.trim(),
+        country: form.country.trim(),
+        address: form.address.trim(),
+        latitude: 0,
+        longitude: 0,
+        pricePerNight: Number(form.pricePerNight),
+        maxGuests: Number(form.maxGuests),
+        bedrooms: Number(form.bedrooms),
+        bathrooms: Number(form.bathrooms),
+      }
+      const createdProperty = await api.createProperty(token, payload)
+      resetForm()
+      onCreated(createdProperty)
+      onClose()
+    } catch (submitError) {
+      setError(message(submitError))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/40 p-5"><div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-3xl bg-card"><div className="flex items-center justify-between border-b border-border px-6 py-5"><div><p className="text-sm font-semibold text-primary">Para anfitriones</p><h2 className="mt-1 text-2xl font-semibold">Publicá tu espacio</h2></div><button type="button" onClick={onClose} className="flex size-10 items-center justify-center rounded-full hover:bg-muted"><X size={18}/></button></div>{!user ? <div className="px-6 py-6"><p className="rounded-xl bg-secondary p-4 text-sm">Iniciá sesión con una cuenta HOST para publicar un alojamiento.</p></div> : <div className="max-h-[calc(90vh-88px)] overflow-y-auto px-6 py-6"><div className="flex flex-col gap-5"><div className="space-y-2"><label className="block text-sm font-medium">Título<input value={form.title} onChange={e=>updateField('title', e.target.value)} placeholder="Ej: Departamento moderno en el centro" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.title && <p className="text-sm text-destructive">{errors.title}</p>}</div><div className="space-y-2"><label className="block text-sm font-medium">Descripción<textarea value={form.description} onChange={e=>updateField('description', e.target.value)} placeholder="Describe tu alojamiento..." rows={4} className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.description && <p className="text-sm text-destructive">{errors.description}</p>}</div><div className="space-y-2"><label className="block text-sm font-medium">Tipo de propiedad<select value={form.propertyType} onChange={e=>updateField('propertyType', e.target.value)} className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"><option value="">Seleccioná un tipo</option>{propertyTypeOptions.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{errors.propertyType && <p className="text-sm text-destructive">{errors.propertyType}</p>}</div><div className="grid gap-5 md:grid-cols-2"><div className="space-y-2"><label className="block text-sm font-medium">Ciudad<input value={form.city} onChange={e=>updateField('city', e.target.value)} placeholder="Ej: Buenos Aires" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.city && <p className="text-sm text-destructive">{errors.city}</p>}</div><div className="space-y-2"><label className="block text-sm font-medium">País<input value={form.country} onChange={e=>updateField('country', e.target.value)} placeholder="Ej: Argentina" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.country && <p className="text-sm text-destructive">{errors.country}</p>}</div></div><div className="space-y-2"><label className="block text-sm font-medium">Dirección<input value={form.address} onChange={e=>updateField('address', e.target.value)} placeholder="Ej: Av. Corrientes 1234" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.address && <p className="text-sm text-destructive">{errors.address}</p>}</div><div className="grid gap-5 md:grid-cols-2"><div className="space-y-2"><label className="block text-sm font-medium">Precio por noche<input type="number" min="1" step="1" value={form.pricePerNight} onChange={e=>updateField('pricePerNight', e.target.value)} placeholder="Ej: 50000" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.pricePerNight && <p className="text-sm text-destructive">{errors.pricePerNight}</p>}</div><div className="space-y-2"><label className="block text-sm font-medium">Máximo de huéspedes<input type="number" min="1" step="1" value={form.maxGuests} onChange={e=>updateField('maxGuests', e.target.value)} placeholder="Ej: 4" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.maxGuests && <p className="text-sm text-destructive">{errors.maxGuests}</p>}</div></div><div className="grid gap-5 md:grid-cols-2"><div className="space-y-2"><label className="block text-sm font-medium">Baños<input type="text" inputMode="numeric" pattern="[0-9]*" value={form.bathrooms} onChange={e=>{ const nextValue = e.target.value; if (nextValue === '' || /^\d+$/.test(nextValue)) { updateField('bathrooms', nextValue) } else { setErrors((current) => ({ ...current, bathrooms: 'Solo se aceptan enteros. Ingresá nuevamente.' })) } }} placeholder="Ej: 2" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.bathrooms && <p className="text-sm text-destructive">{errors.bathrooms}</p>}</div><div className="space-y-2"><label className="block text-sm font-medium">Piezas<input type="text" inputMode="numeric" pattern="[0-9]*" value={form.bedrooms} onChange={e=>{ const nextValue = e.target.value; if (nextValue === '' || /^\d+$/.test(nextValue)) { updateField('bedrooms', nextValue) } else { setErrors((current) => ({ ...current, bedrooms: 'Solo se aceptan enteros. Ingresá nuevamente.' })) } }} placeholder="Ej: 3" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none"/></label>{errors.bedrooms && <p className="text-sm text-destructive">{errors.bedrooms}</p>}</div></div>{error&&<p className="rounded-xl bg-secondary px-4 py-3 text-sm text-destructive">{error}</p>}<button type="button" disabled={busy} onClick={submit} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-60">{busy ? 'Publicando...' : 'Publicar alojamiento'}</button></div></div>}</div></div>}
 
 function BookingsModal({onClose,token,onAuth}:{onClose:()=>void;token:string;onAuth:()=>void}){const [items,setItems]=useState<Booking[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState('load');useEffect(()=>{if(!token){onAuth();return}api.bookings(token).then(r=>setItems(r.data)).catch(e=>setError(message(e))).finally(()=>setBusy(''))},[token,onAuth]);async function cancel(id:string){setBusy(id);setError('');try{const b=await api.cancelBooking(token,id);setItems(list=>list.map(x=>x.id===id?b:x))}catch(e){setError(message(e))}finally{setBusy('')}}return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/40 p-5"><div className="max-h-[86vh] w-full max-w-2xl overflow-auto rounded-3xl bg-card p-7"><div className="flex justify-between"><div><p className="text-sm font-semibold text-primary">Tus viajes</p><h2 className="mt-1 text-2xl font-semibold">Mis reservas</h2></div><button onClick={onClose}><X/></button></div>{error&&<p className="mt-4 rounded-xl bg-secondary p-4 text-sm text-destructive">{error}</p>}{busy==='load'?<p className="mt-6 text-sm text-muted-foreground">Cargando reservas...</p>:items.length?<div className="mt-6 space-y-3">{items.map(b=><div key={b.id} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><b>{b.property?.title || `Reserva ${b.id.slice(0,8)}`}</b><p className="mt-1 text-sm text-muted-foreground">{b.checkIn} a {b.checkOut} · {b.guests} huéspedes · ${money(b.totalPrice)}</p><p className="mt-1 text-xs font-semibold text-primary">{b.status}</p></div>{b.status!=='CANCELED'&&b.status!=='COMPLETED'&&<button disabled={busy===b.id} onClick={()=>cancel(b.id)} className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60">Cancelar</button>}</div></div>)}</div>:<p className="mt-6 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Todavía no tenés reservas.</p>}</div></div>}
 

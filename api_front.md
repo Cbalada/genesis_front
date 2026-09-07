@@ -1,343 +1,332 @@
-# Genesis Rentals - Funcionalidades del proyecto
+# Genesis Rentals - Estado actual del proyecto
 
 ## 1. Descripción general
 
-Genesis Rentals es una plataforma de alquileres de propiedades inspirada en modelos tipo Airbnb. El proyecto combina:
+Genesis Rentals es una plataforma de alquileres tipo marketplace inspirada en Airbnb. El proyecto está compuesto por:
 
-- Frontend: Next.js + React + TypeScript + Tailwind
-- Backend: NestJS + TypeScript
-- Autenticación: JWT
-- Base de datos: PostgreSQL / TypeORM (según la estructura del backend)
-- Objetivo: permitir a usuarios buscar alojamientos, reservar, guardar favoritos y gestionar propiedades como anfitrión o administrador.
+- Frontend: Next.js 16 + React 19 + TypeScript + Tailwind
+- Backend: NestJS + TypeScript + JWT + TypeORM
+- Base de datos: PostgreSQL
+- Objetivo: permitir buscar propiedades, reservar, guardar favoritos, crear alojamientos y administrar la operación con roles.
 
-El flujo principal del sistema está orientado a tres actores:
+La aplicación está pensada para tres perfiles principales:
 
-- Guest / huésped: busca, compara, reserva y califica alojamientos.
+- Guest / huésped: busca propiedades, filtra por destino, reserva y califica alojamientos.
 - Host / propietario: publica propiedades, gestiona disponibilidad y recibe reservas.
 - Admin / administrador: supervisa usuarios, propiedades, reservas y reseñas.
 
+El proyecto ya contempla flujo real de autenticación, permisos por rol, panel de administración y conexión con la API del backend desde el frontend.
+
 ---
 
-## 2. Funcionalidades del frontend
+## 2. Estado actual del frontend
 
-### 2.1 Landing page / home
+La parte del cliente en Next.js ya incluye una landing page y una experiencia de búsqueda completa con UX tipo marketplace.
 
-La aplicación principal en Next muestra una interfaz moderna con:
+### 2.1 Landing page y buscador
 
-- Hero section con propuesta de valor
-- Barra de búsqueda de destino
-- Selector de viajeros
-- Filtros por tipo de propiedad
-- Carrusel visual de propiedades destacadas
-- CTA para explorar alojamientos o publicar un espacio
-- Sección de inspiración y marketing visual
+La app principal en `app/page.tsx` implementa:
 
-La vista principal incluye elementos de UX tipo marketplace:
+- hero section con propuesta de valor
+- barra de búsqueda por destino
+- selector de fechas de check-in y check-out
+- selector de huéspedes
+- filtros por tipo de propiedad
+- listado de propiedades con cards visuales
+- CTA para explorar alojamientos y publicar un espacio
+- sección de inspiración visual
 
-- tarjetas de propiedades con imagen, ubicación y precio
-- favoritos con botón de corazón
-- modal con detalle del alojamiento
-- control para iniciar sesión o continuar como invitado
+### 2.2 Búsqueda y filtros
 
-### 2.2 Búsqueda de propiedades
+La búsqueda del frontend consume la API del backend con `GET /api/properties` y soporta:
 
-La búsqueda permite:
+- ciudad/destino
+- tipo de propiedad (`HOUSE`, `APARTMENT`, `ROOM`, `HOTEL`, etc.)
+- cantidad de huéspedes
+- paginación
+- fallback visual si la API no responde
 
-- filtrar por ciudad o destino
-- filtrar por tipo de propiedad (HOUSE, APARTMENT, etc.)
-- seleccionar cantidad de viajeros
-- consultar propiedades desde la API
-- mostrar un fallback visual cuando la API no responde
-
-La llamada del frontend usa la API:
-
-- GET /api/properties
-- con parámetros como: city, propertyType, guests, page, limit
+El cliente usa `URLSearchParams` y un helper centralizado en `lib/api.ts` para construir las query strings.
 
 ### 2.3 Detalle de propiedad
 
 Al hacer click en una propiedad, el frontend abre un modal con:
 
-- nombre del alojamiento
+- título del alojamiento
 - ciudad y país
-- cantidad de habitaciones, baños y huéspedes
+- habitaciones, baños y huéspedes máximos
 - descripción
 - precio por noche
 - botón para reservar
 
-Esto permite una experiencia rápida sin salir de la página principal.
+### 2.4 Autenticación y sesión
 
-### 2.4 Sistema de autenticación
+El frontend incluye:
 
-La app incluye un modal de login con credenciales demo:
+- modal de login con credenciales demo
+- persistencia de sesión en `localStorage`
+- restauración automática del usuario logueado
+- manejo del token JWT en requests autenticados
+- flujo de cierre de sesión
 
-- Email: guest@genesis.com
-- Password: Password123!
+Credenciales demo oficiales:
 
-También se prepara la lógica para:
+- Email: `guest@genesis.com`
+- Password: `Password123!`
 
-- registro de usuarios
-- obtener perfil autenticado
-- sesión JWT
+También se soportan usuarios con roles:
+
+- `ADMIN`
+- `HOST`
+- `GUEST`
 
 ### 2.5 Favoritos
 
-El frontend tiene lógica para guardar propiedades en favoritos:
+La interfaz permite guardar y quitar propiedades como favoritas:
 
 - botón de corazón por propiedad
-- si el usuario no está logueado, pide iniciar sesión
-- si está autenticado, alterna la propiedad como favorita
+- bloqueo si el usuario no está autenticado
+- sincronización con la API de favoritos del backend
 
-Esto corresponde a la funcionalidad del backend en:
+Endpoints utilizados:
 
-- POST /api/favorites/:propertyId
-- DELETE /api/favorites/:propertyId
-- GET /api/favorites
+- `GET /api/favorites`
+- `POST /api/favorites/:propertyId`
+- `DELETE /api/favorites/:propertyId`
 
 ### 2.6 Publicación de alojamiento para anfitriones
 
-La aplicación tiene un modal para anfitriones con:
+La app incluye un flujo de anfitrión funcional para crear propiedades reales desde el modal existente de publicación, manteniendo el CTA y la estética visual general de la landing page.
 
-- título del alojamiento
-- ciudad
-- precio por noche
-- máximo de huéspedes
-- flujo de demo para guardar el alojamiento
+El flujo actual incluye:
 
-Este flujo representa la funcionalidad de creación de propiedades del backend:
+- formulario completo con título, descripción, tipo de propiedad, ciudad, país, dirección
+- precio por noche, máximo de huéspedes, baños y cantidad de habitaciones
+- validación de campos obligatorios y valores positivos
+- validación de tipos permitidos según el enum del backend: `APARTMENT`, `HOUSE`, `ROOM`, `HOTEL`, `OTHER`
+- bloqueo si el usuario no está autenticado
+- validación de permisos: solo usuarios con rol `HOST` o `ADMIN` pueden publicar
+- envío autenticado a la API con JWT a `POST /api/properties`
+- manejo de estados de carga, éxito y error
+- cierre y limpieza del modal luego de una publicación correcta
+- scroll interno del modal para mantener la experiencia usable en móvil y desktop
 
-- POST /api/properties
+El payload enviado al backend incluye campos como:
+
+- title
+- description
+- propertyType
+- city
+- country
+- address
+- latitude
+- longitude
+- pricePerNight
+- maxGuests
+- bedrooms
+- bathrooms
+
+Este flujo ya está conectado con la API del backend y reutiliza el wrapper centralizado del cliente, sin reemplazar la lógica real de creación por una simulación visual.
 
 ### 2.7 Reserva de alojamiento
 
-La UI incluye un flujo de reserva con:
+El frontend ya implementa un flujo de reserva con:
 
-- botón de Reservar
+- selección de fechas
 - validación de sesión activa
-- mensaje de acción para completar fechas y continuar con la reserva
+- cálculo de noches
+- envío de la reserva a la API
+- control de errores si la propiedad o las fechas no son válidas
 
-La lógica real del backend soporta:
+Endpoints principales:
 
-- POST /api/bookings
-- cálculo de total de la reserva
-- check-in y check-out
-- validación de huéspedes y propiedad
+- `POST /api/bookings`
+- `GET /api/users/me/bookings`
+- `PATCH /api/bookings/:id/cancel`
 
----
+### 2.8 Panel administrativo
 
-## 3. Funcionalidades del backend API
+La UI del frontend incluye acceso a un panel de administración para usuarios con rol `ADMIN`:
 
-El backend de NestJS expone una API REST con un conjunto robusto de módulos para la gestión del alquiler.
+- estadísticas generales
+- listado de usuarios
+- listado de propiedades
+- listado de reservas
+- listado de reseñas
+- cambio de rol por usuario
+- eliminación de usuarios y reseñas
 
-### 3.1 Autenticación y usuarios
-
-#### Registro
-
-- POST /api/auth/register
-- Permite crear un usuario nuevo
-- Devuelve JWT + datos del usuario
-
-#### Login
-
-- POST /api/auth/login
-- Valida email y contraseña
-- Devuelve accessToken y user
-
-#### Perfil autenticado
-
-- GET /api/auth/me
-- Retorna información del usuario logueado
-
-#### Perfil propio
-
-- GET /api/users/me
-- PATCH /api/users/me
-- Permite ver y actualizar nombre, avatar y datos básicos
-
-#### Roles del sistema
-
-- GUEST: huésped
-- HOST: propietario / anfitrión
-- ADMIN: administrador
+Esto refleja los endpoints del backend bajo `/api/admin`.
 
 ---
 
-## 4. Gestión de propiedades
+## 3. Integración actual con la API
 
-### Funcionalidades principales
+El cliente centraliza la comunicación con la API en `lib/api.ts`.
 
-- Listar propiedades con filtros y paginación
-- Ver detalles de una propiedad por ID
-- Crear propiedades (solo HOST/ADMIN)
-- Actualizar propiedades
-- Eliminar o desactivar propiedades
-- Adjuntar imágenes
-- Definir imagen principal / cover
+### 3.1 Base URL
 
-### Endpoints principales
+El proyecto define:
 
-- GET /api/properties
-- GET /api/properties/:id
-- POST /api/properties
-- PATCH /api/properties/:id
-- DELETE /api/properties/:id
-- POST /api/properties/:id/images
-- DELETE /api/properties/:id/images/:imageId
-- PATCH /api/properties/:id/images/:imageId/cover
+```ts
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+```
 
-### Filtros disponibles
+Esto permite sobrescribir la URL del backend con una variable de entorno en el frontend cuando sea necesario.
 
-- city
-- country
-- minPrice
-- maxPrice
-- guests
-- bedrooms
-- bathrooms
-- propertyType
-- checkIn
-- checkOut
-- page
-- limit
-- sortBy
-- order
+### 3.2 Operaciones implementadas
 
----
+El cliente incluye wrappers para:
 
-## 5. Gestión de reservas
+- `listProperties`
+- `getProperty`
+- `login`
+- `register`
+- `me`
+- `profile`
+- `favorites`
+- `addFavorite`
+- `removeFavorite`
+- `bookings`
+- `createBooking`
+- `cancelBooking`
+- `createReview`
+- `updateReview`
+- `deleteReview`
+- `createProperty`
+- `updateProperty`
+- `deleteProperty`
+- `adminStats`
+- `adminUsers`
+- `adminProperties`
+- `adminBookings`
+- `adminReviews`
+- `changeUserRole`
+- `deleteUser`
+- `adminDeleteReview`
 
-### Funcionalidades principales
-
-- Crear una reserva para una propiedad disponible
-- Consultar reservas del usuario o del anfitrión
-- Consultar detalles de una reserva
-- Cancelar reservas
-- Controlar reglas según rol y fechas
-
-### Estados de reserva
-
-- PENDING
-- CONFIRMED
-- CANCELED
-- COMPLETED
-
-### Reglas importantes
-
-- Un HOST no puede reservar su propia propiedad, salvo ADMIN
-- El guest solo puede cancelar sus propias reservas con ciertos límites de tiempo
-- ADMIN puede ver todas las reservas
-- HOST puede ver reservas de sus propiedades
-- GUEST puede ver solo sus reservas
-
-### Endpoints principales
-
-- POST /api/bookings
-- GET /api/bookings
-- GET /api/bookings/:id
-- PATCH /api/bookings/:id/cancel
+Además, el cliente cuenta con manejo de errores para convertir respuestas HTTP en mensajes amigables al usuario.
 
 ---
 
-## 6. Favoritos
+## 4. Estado actual del backend
 
-La plataforma permite guardar propiedades preferidas por usuario.
+El backend en `proyecto_genesis_back` ya implementa una API REST con módulos claramente separados y lógica de negocio según roles.
 
-### Funcionalidades
+### 4.1 Módulos principales
 
-- Agregar propiedad a favoritos
-- Quitar propiedad de favoritos
-- Listar favoritos de un usuario
+- `auth`: login, registro, perfil autenticado
+- `users`: perfil del usuario, actualización propia, reservas y favoritos del usuario
+- `properties`: listado, detalle, creación, edición, eliminación y filtros avanzados
+- `bookings`: reservas, validaciones de disponibilidad, estados y cancelación
+- `favorites`: agregar/quitar/listar propiedades preferidas
+- `reviews`: calificaciones y comentarios de alojamientos completos
+- `admin`: métricas y gestión global
 
-### Endpoints
+### 4.2 Roles del sistema
 
-- POST /api/favorites/:propertyId
-- DELETE /api/favorites/:propertyId
-- GET /api/favorites
+- `GUEST`
+- `HOST`
+- `ADMIN`
 
-Esto se refleja en el frontend con el botón de corazón en cada propiedad.
+### 4.3 Estados principales
 
----
-
-## 7. Reviews / reseñas
-
-Los usuarios pueden dejar opiniones sobre una estadía realizada.
-
-### Funcionalidades
-
-- crear review solo si la reserva corresponde al usuario
-- la reserva debe estar completada
-- la propiedad y la reserva deben coincidir
-- cada reserva puede tener una sola review
-- el autor puede modificar o borrar su review
-
-### Endpoints
-
-- POST /api/reviews
-- GET /api/properties/:propertyId/reviews
-- PATCH /api/reviews/:id
-- DELETE /api/reviews/:id
+- `PropertyStatus`: `ACTIVE`, `INACTIVE`
+- `BookingStatus`: `PENDING`, `CONFIRMED`, `CANCELED`, `COMPLETED`
+- `PropertyType`: `APARTMENT`, `HOUSE`, `ROOM`, `HOTEL`, `OTHER`
 
 ---
 
-## 8. Administración
+## 5. Endpoints clave del backend
 
-El backend incluye un área administrativa con métricas y gestión completa.
+### Autenticación
 
-### Estadísticas
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 
-- total de usuarios
-- total de propiedades
-- total de reservas
-- total de reseñas
-- reservas activas
-- reservas completadas
-- reservas canceladas
+### Usuarios
 
-### Endpoints admin
+- `GET /api/users/me`
+- `PATCH /api/users/me`
+- `GET /api/users/me/bookings`
+- `GET /api/users/me/favorites`
 
-- GET /api/admin/stats
-- GET /api/admin/users
-- PATCH /api/admin/users/:id/role
-- DELETE /api/admin/users/:id
-- GET /api/admin/properties
-- GET /api/admin/bookings
-- GET /api/admin/reviews
+### Propiedades
 
-Esto permite un control centralizado del funcionamiento de la plataforma.
+- `GET /api/properties`
+- `GET /api/properties/:id`
+- `POST /api/properties`
+- `PATCH /api/properties/:id`
+- `DELETE /api/properties/:id`
+
+### Favoritos
+
+- `GET /api/favorites`
+- `POST /api/favorites/:propertyId`
+- `DELETE /api/favorites/:propertyId`
+
+### Reservas
+
+- `POST /api/bookings`
+- `GET /api/bookings`
+- `GET /api/bookings/:id`
+- `PATCH /api/bookings/:id/cancel`
+
+### Reseñas
+
+- `POST /api/reviews`
+- `GET /api/properties/:propertyId/reviews`
+- `PATCH /api/reviews/:id`
+- `DELETE /api/reviews/:id`
+
+### Administración
+
+- `GET /api/admin/stats`
+- `GET /api/admin/users`
+- `PATCH /api/admin/users/:id/role`
+- `DELETE /api/admin/users/:id`
+- `GET /api/admin/properties`
+- `GET /api/admin/bookings`
+- `GET /api/admin/reviews`
 
 ---
 
-## 9. Flujo típico del usuario
+## 6. Flujo real del usuario
 
 ### Como huésped
 
-1. Ingresa a la landing page
-2. Busca un destino o filtra propiedades
-3. Revisa las tarjetas con precios y datos
-4. Abre el detalle de una propiedad
-5. Inicia sesión
-6. Guarda favoritos si quiere
-7. Reserva el alojamiento con fechas y cantidad de huéspedes
-8. Puede luego ver sus reservas y reseñas
+1. Ingresa a la landing page.
+2. Busca un destino o filtra propiedades.
+3. Revisa tarjetas con precio, ubicación y capacidad.
+4. Abre el detalle de un alojamiento.
+5. Inicia sesión con credenciales demo.
+6. Guarda favoritos si quiere.
+7. Completa fechas y huéspedes.
+8. Crea la reserva a través de la API.
+9. Consulta sus reservas y reseñas.
 
 ### Como anfitrión
 
-1. Inicia sesión como HOST
-2. Accede a la opción de publicar alojamiento
-3. Completa datos del inmueble
-4. Crea la propiedad con precio, ubicación y capacidad
-5. Gestiona reservas y mantiene la propiedad activa/inactiva
+1. Inicia sesión con rol `HOST` o `ADMIN`.
+2. Hace click en el CTA de Publicá tu espacio.
+3. El modal existente abre con el formulario completo de publicación.
+4. Completa todos los campos obligatorios y valida el inmueble antes de enviarlo.
+5. El frontend envía los datos reales a `POST /api/properties` usando la sesión autenticada.
+6. Si no hay sesión activa, se dispara el flujo de login del sistema.
+7. La propiedad queda creada y visible en la lista de alojamientos del frontend.
+8. Gestiona reservas y estado de la propiedad.
 
 ### Como administrador
 
-1. Ver métricas del sistema
-2. Revisar usuarios, propiedades y reservas
-3. Cambiar roles
-4. Gestionar contenido y actividad global
+1. Revisa métricas del sistema.
+2. Gestiona usuarios y roles.
+3. Monitorea propiedades, reservas y reseñas.
+4. Hace mantenimiento operativo del marketplace.
 
 ---
 
-## 10. Stack tecnológico
+## 7. Stack tecnológico actual
 
 ### Frontend
 
@@ -345,59 +334,55 @@ Esto permite un control centralizado del funcionamiento de la plataforma.
 - React 19
 - TypeScript
 - Tailwind CSS
-- shadcn-style UI components
-- lucide-react icons
+- lucide-react
+- UI con estilo shadcn / componentes reutilizables
 
 ### Backend
 
 - NestJS
 - TypeScript
 - JWT
-- TypeORM / DB layer
-- módulos de auth, users, properties, bookings, favorites, reviews, admin
+- TypeORM
+- PostgreSQL
+- Swagger / documentación API
+- Despliegue pensado para entorno serverless o Node tradicional
 
 ---
 
-## 11. Resumen ejecutivo
+## 8. Datos de prueba recomendados
 
-Genesis Rentals es una plataforma completa de alquileres con capacidad para:
+El backend incluye usuarios de prueba con password común:
 
-- explorar propiedades
-- gestionar cuentas y roles
-- publicar alojamientos
-- reservar y cancelar estadías
-- guardar favoritos
-- dejar reseñas
-- administrar la operación desde un panel de admin
+- `Password123!`
 
-Es un proyecto orientado a ser una solución realista de marketplace inmobiliario / turístico con lógica de negocio clara, validación de permisos y experiencia de usuario moderna.
+Usuarios disponibles:
 
----
-
-## 12. Datos de prueba recomendados
-
-El backend documenta usuarios de prueba con password:
-
-- Password123!
-
-Usuarios:
-
-- admin@genesis.com (ADMIN)
-- host@genesis.com (HOST)
-- guest@genesis.com (GUEST)
-- ana@genesis.com (GUEST)
+- `admin@genesis.com` — `ADMIN`
+- `host@genesis.com` — `HOST`
+- `guest@genesis.com` — `GUEST`
+- `ana@genesis.com` — `GUEST`
 
 ---
 
-## 13. URLs relevantes
+## 9. URLs relevantes
 
-Frontend local:
+### Frontend local
 
-- http://localhost:3000 (o el puerto del proyecto Next)
+- `http://localhost:3000`
 
-Backend local:
+### Backend local
 
-- http://localhost:3000/api (según configuración del backend)
-- http://localhost:3000/api/docs
+- `http://localhost:3000/api`
+- `http://localhost:3000/api/docs`
 
-Esta documentación resume las funcionalidades principales y la arquitectura funcional del proyecto Genesis Rentals.
+> Si el frontend y el backend corren en puertos distintos, la URL del backend se puede sobrescribir con `NEXT_PUBLIC_API_URL` en el proyecto frontend.
+
+---
+
+## 10. Resumen ejecutivo
+
+Genesis Rentals ya está en una etapa funcional avanzada: incluye una UI moderna, autenticación con JWT, catálogo de propiedades, favoritos, reservas, reseñas y administración completa. Además, el flujo de publicación para anfitriones quedó reforzado con un formulario real, validación de negocio y conexión auténtica con la API del backend.
+
+La base del proyecto está consolidada y lista para seguir evolucionando con más validaciones, pagos, disponibilidad avanzada y paneles de gestión más completos.
+
+La documentación actual refleja el estado real del repositorio: el frontend ya integra con la API, el backend ya expone la lógica de negocio necesaria para una plataforma de alquileres completa, y el flujo de creación de propiedades ya funciona como una experiencia de publicación real, no demo.
