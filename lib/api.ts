@@ -1,4 +1,4 @@
-﻿export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
 
 export type UserRole = 'GUEST' | 'HOST' | 'ADMIN'
 export type PropertyType = 'APARTMENT' | 'HOUSE' | 'ROOM' | 'HOTEL' | 'OTHER'
@@ -6,7 +6,7 @@ export type PropertyStatus = 'ACTIVE' | 'INACTIVE'
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELED' | 'COMPLETED'
 
 export type User = { id: string; name: string; email: string; role: UserRole; avatarUrl?: string | null; createdAt?: string; updatedAt?: string }
-export type PropertyImage = { id?: string; propertyId?: string; imageUrl: string; isCover?: boolean; createdAt?: string }
+export type PropertyImage = { id?: string; propertyId?: string; imageUrl: string; driveFileId?: string; isCover?: boolean; createdAt?: string }
 export type Property = { id: string; hostId?: string; title: string; description?: string; propertyType: PropertyType | string; city: string; country: string; address?: string; latitude?: string | number; longitude?: string | number; pricePerNight: string | number; maxGuests: number; bedrooms: number; bathrooms: number; images?: PropertyImage[]; status?: PropertyStatus | string }
 export type Booking = { id: string; propertyId: string; guestId?: string; checkIn: string; checkOut: string; guests: number; totalPrice: string | number; status: BookingStatus | string; property?: Partial<Property> }
 export type Favorite = { id: string; userId: string; propertyId: string; createdAt: string; property?: Partial<Property> }
@@ -41,7 +41,9 @@ export function toUserMessage(status: number, body?: ApiErrorBody) {
 
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(options.headers)
-  if (!headers.has('Content-Type') && options.body) headers.set('Content-Type', 'application/json')
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
   const body = await response.json().catch(() => undefined)
@@ -59,6 +61,46 @@ const qs = (params?: URLSearchParams | Record<string, string | number | undefine
   }
   const query = search.toString()
   return query ? `?${query}` : ''
+}
+
+export async function uploadPropertyImage(
+  propertyId: string,
+  file: File,
+  isCover: boolean,
+  token: string
+): Promise<PropertyImage> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('isCover', String(isCover))
+
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/images`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+
+  const body = await response.json().catch(() => undefined)
+  if (!response.ok) throw new ApiError(response.status, body)
+  return body as PropertyImage
+}
+
+export async function deletePropertyImage(
+  propertyId: string,
+  imageId: string,
+  token: string
+): Promise<void> {
+  return request<void>(`/properties/${propertyId}/images/${imageId}`, { method: 'DELETE' }, token)
+}
+
+export async function setCoverImage(
+  propertyId: string,
+  imageId: string,
+  token: string
+): Promise<void> {
+  return request<void>(`/properties/${propertyId}/images/${imageId}/cover`, { method: 'PATCH' }, token)
 }
 
 export const api = {
@@ -83,6 +125,9 @@ export const api = {
   createProperty: (token: string, data: Omit<Property, 'id' | 'images' | 'status'>) => request<Property>('/properties', { method: 'POST', body: JSON.stringify(data) }, token),
   updateProperty: (token: string, id: string, data: Partial<Property>) => request<Property>(`/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, token),
   deleteProperty: (token: string, id: string) => request<void>(`/properties/${id}`, { method: 'DELETE' }, token),
+  uploadPropertyImage,
+  deletePropertyImage,
+  setCoverImage,
   adminStats: (token: string) => request<AdminStats>('/admin/stats', {}, token),
   adminUsers: (token: string) => request<PageResponse<User>>('/admin/users?page=1&limit=10', {}, token),
   adminProperties: (token: string) => request<PageResponse<Property>>('/admin/properties?page=1&limit=10', {}, token),
