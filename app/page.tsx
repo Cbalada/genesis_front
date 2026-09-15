@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Globe2, Heart, Menu, Search, SlidersHorizontal, Star, Users, X } from 'lucide-react'
 import { api, type AdminStats, type Booking, type Property, type PropertyType, type Review, type User, type UserRole } from '@/lib/api'
 import PropertyImageUploader from '@/components/PropertyImageUploader'
+import SearchBar from '@/components/SearchBar'
 
 const fallback: Property[] = [
  { id:'1', title:'Casa de diseño frente al lago', city:'Villa La Angostura', country:'Argentina', pricePerNight:184, maxGuests:6, bedrooms:3, bathrooms:2, propertyType:'HOUSE', description:'Casa equipada para descansar frente al lago.', images:[{imageUrl:'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
@@ -131,141 +132,36 @@ export default function Page() {
  }
  // compatibility wrapper for existing increment/decrement usage (sets adults)
  const setGuests = (n:number) => setGuestCounts(g=>({...g, adults: Math.max(1, n)}))
- return <main className="min-h-screen bg-background text-foreground">
-  <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur"><div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-4 lg:px-10"><a href="#inicio" className="flex items-center gap-2"><span className="flex size-9 items-center justify-center rounded-xl bg-primary font-black text-primary-foreground">G</span><b className="text-xl tracking-tight">genesis<span className="text-primary">.</span></b></a><nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex"><a href="#alojamientos" className="text-foreground">Alojamientos</a><a href="#inspiracion">Inspiración</a><a href="#anfitriones">Para anfitriones</a></nav><div className="flex items-center gap-2"><button onClick={()=>user?setMenu(!menu):setAuth(true)} className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-muted sm:block">{loading?'Verificando...':user?.name || 'Iniciar sesión'}</button><button className="flex size-10 items-center justify-center rounded-full border border-border"><Globe2 size={17}/></button><button onClick={()=>setMenu(!menu)} className="flex size-10 items-center justify-center rounded-full border border-border"><Menu size={18}/></button>{menu&&<div className="absolute right-5 top-16 w-56 rounded-2xl border border-border bg-card p-2 shadow-xl"><button onClick={()=>user?logout():setAuth(true)} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">{user?'Cerrar sesión':'Iniciar sesión'}</button><button onClick={()=>{setHost(true);setMenu(false)}} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Publicar alojamiento</button><button onClick={()=>{user?setBookingsOpen(true):setAuth(true);setMenu(false)}} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Mis reservas</button>{user?.role==='ADMIN'&&<button onClick={()=>{setAdminOpen(true);setMenu(false)}} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Panel admin</button>}</div>}</div></div><div className="mx-auto max-w-4xl px-5 pb-4 lg:px-10"><div className="flex flex-col rounded-2xl border border-border bg-card p-2 shadow-sm md:flex-row"><label className="flex flex-1 flex-col gap-1 rounded-xl px-4 py-2 text-xs font-semibold hover:bg-muted">¿A dónde vas?<input value={destination} onChange={e=>setDestination(e.target.value)} placeholder="Explorá destinos" className="bg-transparent text-sm font-normal outline-none"/></label>
-  <div className="relative flex-1 px-2">
-    <button onClick={()=>{ setShowDatePicker(!showDatePicker); setShowGuests(false) }} className="w-full text-left flex flex-col gap-1 rounded-xl px-4 py-2 text-xs font-semibold hover:bg-muted">
-      <span className="flex items-center gap-2"><CalendarDays size={14}/> Fechas</span>
-      <span className="text-sm font-normal text-muted-foreground">{checkIn && checkOut ? `${new Date(checkIn).toLocaleDateString('es-AR',{day:'2-digit',month:'short'})} - ${new Date(checkOut).toLocaleDateString('es-AR',{day:'2-digit',month:'short'})} · ${nights} noches` : (checkIn ? `${new Date(checkIn).toLocaleDateString('es-AR',{day:'2-digit',month:'short'})} → Seleccionar salida` : 'Agregar fechas')}</span>
-    </button>
-    {showDatePicker && (
-      <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[340px] rounded-2xl border border-border bg-card p-4 shadow-xl" onClick={e=>e.stopPropagation()}>
-        <div className="mb-3 text-sm text-muted-foreground">{!checkIn ? 'Elegí fecha de entrada' : !checkOut ? 'Elegí fecha de salida' : `Rango: ${nights} noches`}</div>
-        <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-border bg-secondary/30 p-2 text-sm">
-          <button type="button" onClick={()=>setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()-1, 1))} className="flex size-8 items-center justify-center rounded-full hover:bg-muted">‹</button>
-          <span className="font-medium">{monthLabel(calendarMonth)}</span>
-          <button type="button" onClick={()=>setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 1))} className="flex size-8 items-center justify-center rounded-full hover:bg-muted">›</button>
-        </div>
-        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
-          {Array.from({length:7}).map((_, index) => (
-            <span key={index}>{weekdayLabel(new Date(2024, 0, index + 1))}</span>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((day) => {
-            const key = toDateKey(day)
-            const isCurrentMonth = day.getMonth() === calendarMonth.getMonth()
-            const isRangeDay = !!checkIn && !!checkOut && isDateInRange(day)
-            const isSelected = isDateSelected(day)
-            const isDisabled = !!checkIn && !!checkOut && !isRangeDay && !isSelected
-            const isPast = new Date(day.getFullYear(), day.getMonth(), day.getDate()) < new Date(new Date().toDateString())
-            const isInvalidRange = !!checkIn && !checkOut && checkIn && new Date(key) < new Date(checkIn)
-            const isClickable = !isPast
-            return (
-              <button
-                key={key}
-                type="button"
-                disabled={!isClickable || isDisabled}
-                onClick={() => {
-                  if (!checkIn || (checkIn && checkOut)) {
-                    setCheckIn(key)
-                    setCheckOut('')
-                    setCalendarMonth(new Date(day.getFullYear(), day.getMonth(), 1))
-                    return
-                  }
-                  if (new Date(key) <= new Date(checkIn)) {
-                    setCheckIn(key)
-                    setCheckOut('')
-                    return
-                  }
-                  setCheckOut(key)
-                  setShowDatePicker(false)
-                }}
-                className={`flex h-9 items-center justify-center rounded-lg text-sm ${
-                  !isCurrentMonth ? 'text-muted-foreground/40' : 'text-foreground'
-                } ${isSelected ? 'bg-primary text-primary-foreground' : ''} ${isRangeDay ? 'bg-primary/10 text-primary' : ''} ${
-                  !isSelected && !isRangeDay && isCurrentMonth ? 'hover:bg-muted' : ''
-                } ${isPast ? 'cursor-not-allowed opacity-40' : ''}`}
-              >
-                {day.getDate()}
-              </button>
-            )
-          })}
-        </div>
-        <div className="mt-4 flex justify-between gap-2">
-          <button onClick={()=>{ setCheckIn(''); setCheckOut(''); setShowDatePicker(false) }} className="rounded-full border px-4 py-2 text-sm font-medium hover:bg-muted">Limpiar</button>
-          <button onClick={()=>setShowDatePicker(false)} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Cerrar</button>
-        </div>
-      </div>
-    )}
-  </div>
-  <div className="relative flex flex-1 items-center gap-2">
-    <div className="flex-1">
-      <button onClick={()=>{ setShowGuests(!showGuests); setShowDatePicker(false) }} className="w-full text-left flex flex-col gap-1 rounded-xl px-4 py-2 text-xs font-semibold hover:bg-muted">
-        <span className="flex items-center gap-2"><Users size={14}/> Viajeros</span>
-        <span className="text-sm font-normal text-muted-foreground">
-          {guests > 0 ? `${guests} ${guests === 1 ? 'persona' : 'personas'}` : '0 personas'}
-          {(guestCounts.infants > 0 || guestCounts.pets > 0) ? ` · ${guestCounts.infants > 0 ? `${guestCounts.infants} ${guestCounts.infants === 1 ? 'bebé' : 'bebés'}` : ''}${guestCounts.infants > 0 && guestCounts.pets > 0 ? ' · ' : ''}${guestCounts.pets > 0 ? `${guestCounts.pets} ${guestCounts.pets === 1 ? 'mascota' : 'mascotas'}` : ''}` : ''}
-        </span>
-      </button>
-      {showGuests && (
-        <div className="absolute right-0 top-16 z-40 w-72 rounded-2xl border border-border bg-card p-4 shadow-xl" onClick={e=>e.stopPropagation()}>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium">Adultos</div>
-                <div className="text-xs text-muted-foreground">13+ años</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,adults:Math.max(0,g.adults-1)}))}} disabled={guestCounts.adults<=0} className="size-8 rounded-full border disabled:opacity-50">-</button>
-                <span>{guestCounts.adults}</span>
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,adults:g.adults+1}))}} className="size-8 rounded-full border">+</button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium">Niños</div>
-                <div className="text-xs text-muted-foreground">2–12 años</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,children:Math.max(0,g.children-1)}))}} disabled={guestCounts.children<=0} className="size-8 rounded-full border disabled:opacity-50">-</button>
-                <span>{guestCounts.children}</span>
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,children:g.children+1}))}} className="size-8 rounded-full border">+</button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium">Bebés</div>
-                <div className="text-xs text-muted-foreground">Menores de 2 años</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,infants:Math.max(0,g.infants-1)}))}} disabled={guestCounts.infants<=0} className="size-8 rounded-full border disabled:opacity-50">-</button>
-                <span>{guestCounts.infants}</span>
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,infants:g.infants+1}))}} className="size-8 rounded-full border">+</button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium">Mascotas</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,pets:Math.max(0,g.pets-1)}))}} disabled={guestCounts.pets<=0} className="size-8 rounded-full border disabled:opacity-50">-</button>
-                <span>{guestCounts.pets}</span>
-                <button onClick={e=>{e.stopPropagation(); setGuestCounts(g=>({...g,pets:g.pets+1}))}} className="size-8 rounded-full border">+</button>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-2">
-              <button onClick={()=>{ setGuestCounts({adults:0,children:0,infants:0,pets:0}); setShowGuests(false) }} className="rounded-full border px-4 py-2 text-sm font-medium hover:bg-muted">Limpiar</button>
-              <button onClick={()=>setShowGuests(false)} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
 
-    <button disabled={busy==='search'} onClick={()=>search()} className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-60" aria-label="Buscar"><Search size={19}/></button>
-  </div></div></div></header>
-  <section id="inicio" className="mx-auto max-w-[1440px] px-5 pb-10 pt-10 lg:px-10 lg:pt-14"><div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr]"><div className="max-w-xl"><p className="mb-5 text-sm font-semibold uppercase tracking-[.18em] text-primary">Tu próxima historia empieza acá</p><h1 className="text-balance text-5xl font-semibold leading-[1.02] tracking-[-.045em] sm:text-6xl lg:text-7xl">Encontrá un lugar para <span className="text-primary">sentirte en casa.</span></h1><p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Alojamientos únicos, anfitriones reales y destinos que se quedan con vos mucho después de volver.</p><div className="mt-8 flex flex-wrap gap-3"><a href="#alojamientos" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground">Explorar alojamientos <ArrowRight size={16}/></a><button onClick={()=>setHost(true)} className="rounded-full border border-border px-6 py-3.5 text-sm font-semibold hover:bg-muted">Publicá tu espacio</button></div><div className="mt-10 flex gap-6 text-sm"><div><strong className="text-lg">+12k</strong><span className="ml-2 text-muted-foreground">alojamientos</span></div><div className="h-8 w-px bg-border"/><div><strong className="text-lg">4.9</strong><span className="ml-2 text-muted-foreground">valoración media</span></div></div></div><div className="relative overflow-hidden rounded-[2rem]"><img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1600&q=90" alt="Casa junto a un lago" className="h-[420px] w-full object-cover sm:h-[520px]"/><div className="absolute bottom-5 left-5 right-5 flex items-end justify-between rounded-2xl bg-primary/90 p-4 text-primary-foreground"><div><p className="text-xs opacity-75">Escapada destacada</p><p className="mt-1 font-semibold">Patagonia, Argentina</p></div><span className="rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs">Desde $98 / noche</span></div></div></div></section>
+ return (
+  <main className="min-h-screen bg-background text-foreground">
+   <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
+    <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-4 lg:px-10">
+     <a href="#inicio" className="flex items-center gap-2"><span className="flex size-9 items-center justify-center rounded-xl bg-primary font-black text-primary-foreground">G</span><b className="text-xl tracking-tight">genesis<span className="text-primary">.</span></b></a>
+     <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex"><a href="#alojamientos" className="text-foreground">inicio</a><a href="/alojamientos">Alojamientos</a><a href="#anfitriones">Para anfitriones</a></nav>
+     <div className="flex items-center gap-2"><button onClick={()=>user?setMenu(!menu):setAuth(true)} className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-muted sm:block">{loading?'Verificando...':user?.name || 'Iniciar sesión'}</button><button className="flex size-10 items-center justify-center rounded-full border border-border"><Globe2 size={17}/></button><button onClick={()=>setMenu(!menu)} className="flex size-10 items-center justify-center rounded-full border border-border"><Menu size={18}/></button>{menu&&<div className="absolute right-5 top-16 w-56 rounded-2xl border border-border bg-card p-2 shadow-xl"><button onClick={()=>user?logout():setAuth(true)} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">{user?'Cerrar sesión':'Iniciar sesión'}</button><button onClick={()=>{setHost(true);setMenu(false)}} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Publicar alojamiento</button><button onClick={()=>{user?setBookingsOpen(true):setAuth(true);setMenu(false)}} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Mis reservas</button>{user?.role==='ADMIN'&&<button onClick={()=>{setAdminOpen(true);setMenu(false)}} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Panel admin</button>}</div>}</div>
+    </div>
+    <SearchBar
+      destination={destination}
+      setDestination={setDestination}
+      checkIn={checkIn}
+      setCheckIn={setCheckIn}
+      checkOut={checkOut}
+      setCheckOut={setCheckOut}
+      showDatePicker={showDatePicker}
+      setShowDatePicker={setShowDatePicker}
+      calendarMonth={calendarMonth}
+      setCalendarMonth={setCalendarMonth}
+      guestCounts={guestCounts}
+      setGuestCounts={setGuestCounts}
+      showGuests={showGuests}
+      setShowGuests={setShowGuests}
+      guests={guests}
+      busy={busy}
+      onSearch={() => search()}
+    />
+   </header>
+   <section id="inicio" className="mx-auto max-w-[1440px] px-5 pb-10 pt-10 lg:px-10 lg:pt-14"><div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr]"><div className="max-w-xl"><p className="mb-5 text-sm font-semibold uppercase tracking-[.18em] text-primary">Tu próxima historia empieza acá</p><h1 className="text-balance text-5xl font-semibold leading-[1.02] tracking-[-.045em] sm:text-6xl lg:text-7xl">Encontrá un lugar para <span className="text-primary">sentirte en casa.</span></h1><p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Alojamientos únicos, anfitriones reales y destinos que se quedan con vos mucho después de volver.</p><div className="mt-8 flex flex-wrap gap-3"><a href="#alojamientos" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground">Explorar alojamientos <ArrowRight size={16}/></a><button onClick={()=>setHost(true)} className="rounded-full border border-border px-6 py-3.5 text-sm font-semibold hover:bg-muted">Publicá tu espacio</button></div><div className="mt-10 flex gap-6 text-sm"><div><strong className="text-lg">+12k</strong><span className="ml-2 text-muted-foreground">alojamientos</span></div><div className="h-8 w-px bg-border"/><div><strong className="text-lg">4.9</strong><span className="ml-2 text-muted-foreground">valoración media</span></div></div></div><div className="relative overflow-hidden rounded-[2rem]"><img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1600&q=90" alt="Casa junto a un lago" className="h-[420px] w-full object-cover sm:h-[520px]"/><div className="absolute bottom-5 left-5 right-5 flex items-end justify-between rounded-2xl bg-primary/90 p-4 text-primary-foreground"><div><p className="text-xs opacity-75">Escapada destacada</p><p className="mt-1 font-semibold">Patagonia, Argentina</p></div><span className="rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs">Desde $98 / noche</span></div></div></div></section>
   <section id="alojamientos" className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10"><div className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-primary">Para vos</p><h2 className="mt-1 text-3xl font-semibold tracking-tight">Descubrí tu próxima escapada</h2></div><button onClick={()=>search()} className="flex items-center gap-2 self-start rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted"><SlidersHorizontal size={16}/> Filtros</button></div><div className="flex gap-6 overflow-x-auto py-5">{categories.map(([label,value])=><button key={label} onClick={()=>{setCategory(value); search(true, value)}} className={`shrink-0 border-b-2 pb-2 text-sm font-medium ${category===value?'border-primary':'border-transparent text-muted-foreground'}`}>{label}</button>)}</div>{notice&&<div className="mb-5 rounded-xl bg-secondary px-4 py-3 text-sm text-secondary-foreground">{notice}</div>}<div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">{visible.map(p=><article key={p.id} className="group cursor-pointer" onClick={()=>openProperty(p)}><div className="relative overflow-hidden rounded-2xl bg-muted"><img src={img(p)} alt={p.title} className="aspect-[1.18] w-full object-cover transition duration-500 group-hover:scale-105"/><div className="absolute left-3 top-3 rounded-full bg-card/95 px-3 py-1.5 text-xs font-semibold">{p.propertyType==='APARTMENT'?'Gran ubicación':'Favorito entre huéspedes'}</div><button onClick={e=>{e.stopPropagation();toggleFavorite(p.id)}} disabled={busy===`fav-${p.id}`} className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-card/90 disabled:opacity-60" aria-label="Favorito"><Heart size={17} fill={favorites.includes(p.id)?'currentColor':'none'} className={favorites.includes(p.id)?'text-primary':''}/></button></div><div className="pt-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold leading-5">{p.title}</h3><p className="mt-1 text-sm text-muted-foreground">{p.city}, {p.country}</p></div><span className="flex items-center gap-1 text-sm"><Star size={14} fill="currentColor"/> 4.9</span></div><p className="mt-2 text-sm text-muted-foreground">{p.bedrooms} habitaciones · hasta {p.maxGuests} huéspedes</p><p className="mt-2 text-sm"><strong>${money(p.pricePerNight)}</strong> noche</p></div></article>)}</div>{!visible.length&&<div className="rounded-2xl bg-muted p-10 text-center text-muted-foreground">No encontramos alojamientos con esos filtros.</div>}</section>
   <section id="inspiracion" className="mx-auto max-w-[1440px] px-5 py-16 lg:px-10"><div className="grid gap-6 rounded-[2rem] bg-secondary p-8 md:grid-cols-[1fr_auto] md:items-center md:p-12"><div><p className="text-sm font-semibold uppercase tracking-[.16em] text-primary">Viajá distinto</p><h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">Más que un alojamiento, un recuerdo para llevarte.</h2><p className="mt-4 max-w-lg leading-7 text-muted-foreground">Cada estadía tiene una historia. Encontrá la tuya con anfitriones que conocen el lugar como nadie.</p></div><a href="#alojamientos" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground">Ver inspiración <ArrowRight size={16}/></a></div></section>
   <footer id="anfitriones" className="border-t border-border"><div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:px-10"><b className="text-foreground">genesis.</b><span>© 2026 Genesis Rentals</span><button onClick={()=>setHost(true)} className="font-medium text-foreground hover:text-primary">Convertite en anfitrión</button></div></footer>
@@ -275,6 +171,7 @@ export default function Page() {
   {bookingsOpen&&<BookingsModal onClose={()=>setBookingsOpen(false)} token={token} onAuth={()=>setAuth(true)}/>} 
   {adminOpen&&<AdminModal onClose={()=>setAdminOpen(false)} token={token} user={user}/>} 
  </main>
+ )
 }
 
 function PropertyModal({
