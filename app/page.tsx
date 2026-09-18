@@ -6,17 +6,11 @@ import { api, type AdminStats, type Booking, type Property, type PropertyType, t
 import PropertyImageUploader from '@/components/PropertyImageUploader'
 import SearchBar from '@/components/SearchBar'
 
-const fallback: Property[] = [
- { id:'1', title:'Casa de diseño frente al lago', city:'Villa La Angostura', country:'Argentina', pricePerNight:184, maxGuests:6, bedrooms:3, bathrooms:2, propertyType:'HOUSE', description:'Casa equipada para descansar frente al lago.', images:[{imageUrl:'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
- { id:'2', title:'Refugio entre viñedos', city:'Luján de Cuyo, Mendoza', country:'Argentina', pricePerNight:126, maxGuests:4, bedrooms:2, bathrooms:1, propertyType:'HOUSE', description:'Refugio tranquilo entre viñedos.', images:[{imageUrl:'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
- { id:'3', title:'Loft luminoso en Palermo', city:'Buenos Aires', country:'Argentina', pricePerNight:92, maxGuests:3, bedrooms:1, bathrooms:1, propertyType:'APARTMENT', description:'Loft cómodo con excelente ubicación.', images:[{imageUrl:'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
- { id:'4', title:'Cabaña nórdica en el bosque', city:'San Martín de los Andes', country:'Argentina', pricePerNight:148, maxGuests:5, bedrooms:2, bathrooms:1, propertyType:'HOUSE', description:'Cabaña rodeada de bosque.', images:[{imageUrl:'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
- { id:'5', title:'Casa cálida junto al mar', city:'Mar del Plata', country:'Argentina', pricePerNight:108, maxGuests:5, bedrooms:2, bathrooms:2, propertyType:'HOUSE', description:'Casa familiar cerca del mar.', images:[{imageUrl:'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
- { id:'6', title:'Departamento con terraza', city:'Córdoba', country:'Argentina', pricePerNight:74, maxGuests:4, bedrooms:2, bathrooms:1, propertyType:'APARTMENT', description:'Departamento con terraza privada.', images:[{imageUrl:'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85', isCover:true}] },
-]
+const fallback: Property[] = []
+
 const categories = [['Todo',''],['Casas','HOUSE'],['Cabañas','HOUSE'],['Departamentos','APARTMENT'],['Habitaciones','ROOM'],['Hoteles','HOTEL']]
 const storageKey = 'genesis.session'
-const img = (p: Property) => p.images?.find(i=>i.isCover)?.imageUrl || p.images?.[0]?.imageUrl || fallback[0].images![0].imageUrl
+const img = (p: Property) => p.images?.find(i=>i.isCover)?.imageUrl || p.images?.[0]?.imageUrl || ''
 const money = (value: string | number | undefined) => Number(value || 0).toLocaleString('es-AR')
 const message = (error: unknown) => error instanceof Error ? error.message : 'No pudimos completar la operación.'
 const addDays = (date: Date, amount: number) => {
@@ -38,7 +32,7 @@ const weekdayLabel = (value: Date) => value.toLocaleDateString('es-AR', { weekda
 type Session = { token: string; user: User }
 
 export default function Page() {
- const [properties,setProperties] = useState<Property[]>(fallback)
+const [properties, setProperties] = useState<Property[]>([])
  const [destination,setDestination] = useState(''), [category,setCategory] = useState('')
  const [guestCounts,setGuestCounts] = useState({adults:0,children:0,infants:0,pets:0}), [showGuests,setShowGuests] = useState(false)
  const [checkIn,setCheckIn] = useState(''), [checkOut,setCheckOut] = useState(''), [showDatePicker,setShowDatePicker] = useState(false)
@@ -108,13 +102,13 @@ export default function Page() {
   finally { setLoading(false) }
  }
  async function search(silent=false, nextCategory=category){
-  const q=new URLSearchParams({page:'1',limit:'20',guests:String(guests)})
+  const q = new URLSearchParams({ page:'1', limit:'20' })
+  if (guests > 0) q.set('guests', String(guests))
   if(destination.trim()) q.set('city',destination.trim())
   if(nextCategory) q.set('propertyType',nextCategory)
   setBusy('search'); if(!silent) setNotice('')
   try { const r=await api.listProperties(q); setProperties(r.data); if(!r.data.length) setNotice('No encontramos alojamientos con esos filtros.') }
-  catch { if(!silent) setNotice('Mostrando una selección mientras conectamos con Genesis Rentals.'); setProperties(fallback) }
-  finally { setBusy('') }
+  catch { if(!silent) setNotice('No pudimos conectar con el servidor. Intentá de nuevo en un momento.') }  finally { setBusy('') }
  }
  function saveSession(next: Session){ setToken(next.token); setUser(next.user); localStorage.setItem(storageKey, JSON.stringify(next)); syncFavorites(next.token) }
  function logout(){ setToken(''); setUser(null); setFavorites([]); localStorage.removeItem(storageKey); setMenu(false); setNotice('Sesión cerrada correctamente.') }
