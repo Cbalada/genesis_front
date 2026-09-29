@@ -1,14 +1,22 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ChevronLeft, ChevronRight, Globe2, Heart, Menu, Pencil, SlidersHorizontal, Star, X } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Globe2, Heart, Menu, Pencil, Star, X } from 'lucide-react'
 import { api, type AdminStats, type Booking, type Property, type PropertyType, type Review, type User, type UserRole } from '@/lib/api'
 import PropertyImageUploader from '@/components/PropertyImageUploader'
+import Link from 'next/link'
 import SearchBar from '@/components/SearchBar'
 
 const fallback: Property[] = []
 
-const categories = [['Todo',''],['Casas','HOUSE'],['Cabañas','HOUSE'],['Departamentos','APARTMENT'],['Habitaciones','ROOM'],['Hoteles','HOTEL']]
+const categories: [string, string, string][] = [
+  ['Todo', '', 'layout-grid'],
+  ['Casas', 'HOUSE', 'home'],
+  ['Cabañas', 'HOUSE', 'trees'],
+  ['Departamentos', 'APARTMENT', 'building'],
+  ['Habitaciones', 'ROOM', 'bed'],
+  ['Hoteles', 'HOTEL', 'building-skyscraper'],
+]
 const storageKey = 'genesis.session'
 const img = (p: Property) => p.images?.find(i => i.isCover)?.imageUrl || p.images?.[0]?.imageUrl || ''
 const money = (value: string | number | undefined) => Number(value || 0).toLocaleString('es-AR')
@@ -65,6 +73,7 @@ export default function Page() {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null)
   const [bookingsOpen, setBookingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [loadingProps, setLoadingProps] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState('')
   const [notice, setNotice] = useState('')
@@ -88,6 +97,13 @@ export default function Page() {
       return diff > 0 ? diff : 0
     } catch { return 0 }
   }, [checkIn, checkOut])
+  const featuredProperty = useMemo(() => {
+    const withImage = properties.filter(p => img(p))
+    if (!withImage.length) return null
+    // toma la primera con imagen (el backend ya devuelve ordenado por createdAt DESC,
+    // podés cambiar por rating cuando lo tengas disponible)
+      return withImage[0]
+  }, [properties])
   const calendarDays = useMemo(() => {
     const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
     const offset = (monthStart.getDay() + 6) % 7
@@ -146,6 +162,7 @@ export default function Page() {
     if (destination.trim()) q.set('city', destination.trim())
     if (nextCategory) q.set('propertyType', nextCategory)
     setBusy('search')
+    setLoadingProps(true)        
     if (!silent) setNotice('')
     try {
       const r = await api.listProperties(q)
@@ -155,8 +172,9 @@ export default function Page() {
       if (!silent) setNotice('No pudimos conectar con el servidor. Intentá de nuevo en un momento.')
     } finally {
       setBusy('')
+      setLoadingProps(false)    
     }
-  }
+}
 
   function saveSession(next: Session) {
     setToken(next.token)
@@ -266,113 +284,157 @@ export default function Page() {
       </header>
 
       <section id="inicio" className="mx-auto max-w-[1440px] px-5 pb-10 pt-10 lg:px-10 lg:pt-14">
-        <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr]">
-          <div className="max-w-xl">
-            <p className="mb-5 text-sm font-semibold uppercase tracking-[.18em] text-primary">Tu próxima historia empieza acá</p>
-            <h1 className="text-balance text-5xl font-semibold leading-[1.02] tracking-[-.045em] sm:text-6xl lg:text-7xl">
-              Encontrá un lugar para <span className="text-primary">sentirte en casa.</span>
-            </h1>
-            <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">
-              Alojamientos únicos, anfitriones reales y destinos que se quedan con vos mucho después de volver.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#alojamientos" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground">
-                Explorar alojamientos <ArrowRight size={16} />
-              </a>
-              <button onClick={() => { setEditingProperty(null); setHost(true) }} className="rounded-full border border-border px-6 py-3.5 text-sm font-semibold hover:bg-muted">
-                Publicá tu espacio
-              </button>
-            </div>
-            <div className="mt-10 flex gap-6 text-sm">
-              <div><strong className="text-lg">+12k</strong><span className="ml-2 text-muted-foreground">alojamientos</span></div>
-              <div className="h-8 w-px bg-border" />
-              <div><strong className="text-lg">4.9</strong><span className="ml-2 text-muted-foreground">valoración media</span></div>
-            </div>
-          </div>
-          <div className="relative overflow-hidden rounded-[2rem]">
-            <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1600&q=90" alt="Casa junto a un lago" className="h-[420px] w-full object-cover sm:h-[520px]" />
-            <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between rounded-2xl bg-primary/90 p-4 text-primary-foreground">
-              <div>
-                <p className="text-xs opacity-75">Escapada destacada</p>
-                <p className="mt-1 font-semibold">Patagonia, Argentina</p>
-              </div>
-              <span className="rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs">Desde $98 / noche</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="alojamientos" className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10">
-        <div className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-primary">Para vos</p>
-            <h2 className="mt-1 text-3xl font-semibold tracking-tight">Descubrí tu próxima escapada</h2>
-          </div>
-          <button onClick={() => search()} className="flex items-center gap-2 self-start rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted">
-            <SlidersHorizontal size={16} /> Filtros
-          </button>
-        </div>
-        <div className="flex gap-6 overflow-x-auto py-5">
-          {categories.map(([label, value]) => (
-            <button
-              key={label}
-              onClick={() => { setCategory(value); search(true, value) }}
-              className={`shrink-0 border-b-2 pb-2 text-sm font-medium ${category === value ? 'border-primary' : 'border-transparent text-muted-foreground'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {notice && <div className="mb-5 rounded-xl bg-secondary px-4 py-3 text-sm text-secondary-foreground">{notice}</div>}
-        <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map(p => (
-            <article key={p.id} className="group cursor-pointer" onClick={() => openProperty(p)}>
-              <div className="relative overflow-hidden rounded-2xl bg-muted">
-                {img(p)
-                  ? <img src={img(p)} alt={p.title} className="aspect-[1.18] w-full object-cover transition duration-500 group-hover:scale-105" />
-                  : <div className="aspect-[1.18] w-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Sin imagen</div>
-                }
-                <div className="absolute left-3 top-3 rounded-full bg-card/95 px-3 py-1.5 text-xs font-semibold">
-                  {p.propertyType === 'APARTMENT' ? 'Gran ubicación' : 'Favorito entre huéspedes'}
-                </div>
-                <button
-                  onClick={e => { e.stopPropagation(); toggleFavorite(p.id) }}
-                  disabled={busy === `fav-${p.id}`}
-                  className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-card/90 disabled:opacity-60"
-                  aria-label="Favorito"
-                >
-                  <Heart size={17} fill={favorites.includes(p.id) ? 'currentColor' : 'none'} className={favorites.includes(p.id) ? 'text-primary' : ''} />
-                </button>
-                {canEdit(p) && (
-                  <button
-                    onClick={e => openEdit(e, p)}
-                    className="absolute left-3 bottom-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-semibold hover:bg-card transition-colors"
-                    aria-label="Editar propiedad"
-                  >
-                    <Pencil size={12} /> Editar
+            <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr]">
+              <div className="max-w-xl">
+                <p className="mb-5 text-sm font-semibold uppercase tracking-[.18em] text-primary">Tu próxima historia empieza acá</p>
+                <h1 className="text-balance text-5xl font-semibold leading-[1.02] tracking-[-.045em] sm:text-6xl lg:text-7xl">
+                  Encontrá un lugar para <span className="text-primary">sentirte en casa.</span>
+                </h1>
+                <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">
+                  Alojamientos únicos, anfitriones reales y destinos que se quedan con vos mucho después de volver.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link href="/alojamientos" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground">
+                    Explorar alojamientos <ArrowRight size={16} />
+                  </Link>
+                  <button onClick={() => { setEditingProperty(null); setHost(true) }} className="rounded-full border border-border px-6 py-3.5 text-sm font-semibold hover:bg-muted">
+                    Publicá tu espacio
                   </button>
-                )}
-              </div>
-              <div className="pt-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold leading-5">{p.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{p.city}, {p.country}</p>
-                  </div>
-                  <span className="flex items-center gap-1 text-sm"><Star size={14} fill="currentColor" /> 4.9</span>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{p.bedrooms} habitaciones · hasta {p.maxGuests} huéspedes</p>
-                <p className="mt-2 text-sm"><strong>${money(p.pricePerNight)}</strong> noche</p>
+                <div className="mt-10 flex gap-6 text-sm">
+                  <div><strong className="text-lg">+12k</strong><span className="ml-2 text-muted-foreground">alojamientos</span></div>
+                  <div className="h-8 w-px bg-border" />
+                  <div><strong className="text-lg">4.9</strong><span className="ml-2 text-muted-foreground">valoración media</span></div>
+                </div>
               </div>
-            </article>
-          ))}
+              <div className="relative overflow-hidden rounded-[2rem]">
+                {featuredProperty && img(featuredProperty) ? (
+                  <img
+                    src={img(featuredProperty)}
+                    alt={featuredProperty.title}
+                    className="h-[420px] w-full object-cover sm:h-[520px]"
+                    fetchPriority="high"
+                  />
+                ) : (
+                  <div className="h-[420px] w-full bg-muted sm:h-[520px]" />
+                )}
+                <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between rounded-2xl bg-primary/90 p-4 text-primary-foreground">
+                  <div>
+                    <p className="text-xs opacity-75">Escapada destacada</p>
+                    <p className="mt-1 font-semibold">
+                      {featuredProperty ? `${featuredProperty.city}, ${featuredProperty.country}` : 'Genesis Rentals'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-primary-foreground/15 px-3 py-1.5 text-xs">
+                    {featuredProperty ? `Desde $${money(featuredProperty.pricePerNight)} / noche` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="alojamientos" className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10">
+      <div className="border-b border-border pb-5">
+        <p className="text-sm font-semibold text-primary">Para vos</p>
+        <h2 className="mt-1 text-3xl font-semibold tracking-tight">Descubrí tu próxima escapada</h2>
+      </div>
+
+      {/* Pills de categoría con íconos — reemplaza tabs y botón Filtros */}
+      <div className="flex gap-2 overflow-x-auto py-5 scrollbar-hide">
+        {categories.map(([label, value, icon]) => (
+          <button
+            key={label}
+            onClick={() => { setCategory(value); search(true, value) }}
+            className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors
+              ${category === value
+                ? 'border-transparent bg-foreground text-background'
+                : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground'
+              }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="15" height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={`ti ti-${icon}`}
+            >
+              {categoryIcon(icon)}
+            </svg>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {notice && <div className="mb-5 rounded-xl bg-secondary px-4 py-3 text-sm text-secondary-foreground">{notice}</div>}
+
+      {/* Grid: skeleton o propiedades reales */}
+      <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+        {loadingProps
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[1.18] w-full rounded-2xl bg-muted" />
+                <div className="pt-4 space-y-2">
+                  <div className="h-4 w-3/4 rounded-lg bg-muted" />
+                  <div className="h-3 w-1/2 rounded-lg bg-muted" />
+                  <div className="h-3 w-1/3 rounded-lg bg-muted" />
+                </div>
+              </div>
+            ))
+          : visible.map(p => (
+              <article key={p.id} className="group cursor-pointer" onClick={() => openProperty(p)}>
+                <div className="relative overflow-hidden rounded-2xl bg-muted">
+                  {img(p)
+                    ? <img src={img(p)} alt={p.title} className="aspect-[1.18] w-full object-cover transition duration-500 group-hover:scale-105" />
+                    : <div className="aspect-[1.18] w-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Sin imagen</div>
+                  }
+                  <div className="absolute left-3 top-3 rounded-full bg-card/95 px-3 py-1.5 text-xs font-semibold">
+                    {p.propertyType === 'APARTMENT' ? 'Gran ubicación' : 'Favorito entre huéspedes'}
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); toggleFavorite(p.id) }}
+                    disabled={busy === `fav-${p.id}`}
+                    className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-card/90 disabled:opacity-60"
+                    aria-label="Favorito"
+                  >
+                    <Heart size={17} fill={favorites.includes(p.id) ? 'currentColor' : 'none'} className={favorites.includes(p.id) ? 'text-primary' : ''} />
+                  </button>
+                  {canEdit(p) && (
+                    <button
+                      onClick={e => openEdit(e, p)}
+                      className="absolute left-3 bottom-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-semibold hover:bg-card transition-colors"
+                      aria-label="Editar propiedad"
+                    >
+                      <Pencil size={12} /> Editar
+                    </button>
+                  )}
+                </div>
+                <div className="pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold leading-5">{p.title}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">{p.city}, {p.country}</p>
+                    </div>
+                    <span className="flex items-center gap-1 text-sm"><Star size={14} fill="currentColor" /> 4.9</span>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{p.bedrooms} habitaciones · hasta {p.maxGuests} huéspedes</p>
+                  <p className="mt-2 text-sm"><strong>${money(p.pricePerNight)}</strong> noche</p>
+                </div>
+              </article>
+            ))
+        }
+      </div>
+
+      {!loadingProps && !visible.length && (
+        <div className="rounded-2xl bg-muted p-10 text-center text-muted-foreground">
+          No encontramos alojamientos con esos filtros.
         </div>
-        {!visible.length && (
-          <div className="rounded-2xl bg-muted p-10 text-center text-muted-foreground">
-            No encontramos alojamientos con esos filtros.
-          </div>
-        )}
-      </section>
+      )}
+    </section>
 
       <section id="inspiracion" className="mx-auto max-w-[1440px] px-5 py-16 lg:px-10">
         <div className="grid gap-6 rounded-[2rem] bg-secondary p-8 md:grid-cols-[1fr_auto] md:items-center md:p-12">
@@ -443,6 +505,17 @@ export default function Page() {
   )
 }
 
+  function categoryIcon(name: string) {
+    const icons: Record<string, React.ReactNode> = {
+      'layout-grid': <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+      'home': <><path d="M3 12l9-9 9 9"/><path d="M9 21V12h6v9"/></>,
+      'trees': <><path d="M12 22v-7"/><path d="M9 6l3-4 3 4H9z"/><path d="M7 10l5-7 5 7H7z"/><path d="M5 14l7-9 7 9H5z"/></>,
+      'building': <><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></>,
+      'bed': <><path d="M3 7v13"/><path d="M21 7v13"/><path d="M3 14h18"/><path d="M3 7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4"/></>,
+      'building-skyscraper': <><rect x="3" y="2" width="7" height="20" rx="1"/><rect x="14" y="10" width="7" height="12" rx="1"/><path d="M6 6h.01M6 10h.01M6 14h.01M6 18h.01M17 14h.01M17 18h.01"/></>,
+    }
+    return icons[name] ?? null
+  }
 // ─── PropertyModal ───────────────────────────────────────────────────────────
 
 function PropertyModal({
