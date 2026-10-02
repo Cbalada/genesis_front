@@ -20,15 +20,15 @@ const storageKey = 'genesis.session'
 
 const img = (p: Property) =>
   p.images?.find((i) => i.isCover)?.imageUrl ||
-  p.images?.[0]?.imageUrl ||
-  fallback[0].images![0].imageUrl
+  p.images?.[0]?.imageUrl || ''
 
 const money = (value: string | number | undefined) => Number(value || 0).toLocaleString('es-AR')
 
 type Session = { token: string; user: User }
 
 export default function AlojamientosPage() {
-  const [properties, setProperties] = useState<Property[]>(fallback)
+  const [properties, setProperties] = useState<Property[]>([])
+  const [loadingProperties, setLoadingProperties] = useState(true)
   const [destination, setDestination] = useState('')
   const [guestCounts, setGuestCounts] = useState({ adults: 0, children: 0, infants: 0, pets: 0 })
   const [showGuests, setShowGuests] = useState(false)
@@ -92,9 +92,11 @@ export default function AlojamientosPage() {
   async function loadProperties() {
     try {
       const result = await api.listProperties({ page: '1', limit: '50' })
-      setProperties(result.data.length ? result.data : fallback)
+      setProperties(result.data.filter((property) => property.status === 'ACTIVE'))
     } catch {
-      setProperties(fallback)
+      setProperties([])
+    } finally {
+      setLoadingProperties(false)
     }
   }
 
@@ -201,11 +203,22 @@ export default function AlojamientosPage() {
             <p className="text-sm font-semibold text-primary">Alojamientos</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">Descubrí todos los destinos disponibles</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{visible.length} resultados</p>
+          {!loadingProperties && <p className="text-sm text-muted-foreground">{visible.length} resultados</p>}
         </div>
 
         <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((property) => (
+          {loadingProperties
+            ? Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="aspect-[1.18] w-full rounded-2xl bg-muted" />
+                  <div className="space-y-2 pt-4">
+                    <div className="h-4 w-3/4 rounded-lg bg-muted" />
+                    <div className="h-3 w-1/2 rounded-lg bg-muted" />
+                    <div className="h-3 w-1/3 rounded-lg bg-muted" />
+                  </div>
+                </div>
+              ))
+            : visible.map((property) => (
             <article key={property.id} className="group cursor-pointer">
               <div className="relative overflow-hidden rounded-2xl bg-muted">
                 <img

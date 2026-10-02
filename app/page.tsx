@@ -230,7 +230,7 @@ export default function Page() {
           <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
             <a href="#alojamientos" className="text-foreground">inicio</a>
             <a href="/alojamientos">Alojamientos</a>
-            <a href="#anfitriones">Para anfitriones</a>
+            <a href="/anfitriones">Para anfitriones</a>
           </nav>
           <div className="flex items-center gap-2">
             <button onClick={() => user ? setMenu(!menu) : setAuth(true)} className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-muted sm:block">
@@ -439,13 +439,17 @@ export default function Page() {
       <section id="inspiracion" className="mx-auto max-w-[1440px] px-5 py-16 lg:px-10">
         <div className="grid gap-6 rounded-[2rem] bg-secondary p-8 md:grid-cols-[1fr_auto] md:items-center md:p-12">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[.16em] text-primary">Viajá distinto</p>
-            <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">Más que un alojamiento, un recuerdo para llevarte.</h2>
-            <p className="mt-4 max-w-lg leading-7 text-muted-foreground">Cada estadía tiene una historia. Encontrá la tuya con anfitriones que conocen el lugar como nadie.</p>
+            <p className="text-sm font-semibold uppercase tracking-[.16em] text-primary">Convertite en anfitrión</p>
+            <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              Tu espacio puede ser la próxima escapada de alguien.
+            </h2>
+            <p className="mt-4 max-w-lg leading-7 text-muted-foreground">
+              Publicá tu propiedad en Genesis, conectá con viajeros de todo el país y generá ingresos extra haciendo lo que ya sabés: recibir gente.
+            </p>
           </div>
-          <a href="#alojamientos" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground">
-            Ver inspiración <ArrowRight size={16} />
-          </a>
+          <Link href="/anfitriones" className="flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground whitespace-nowrap">
+            Quiero ser anfitrión <ArrowRight size={16} />
+          </Link>
         </div>
       </section>
 
