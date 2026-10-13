@@ -1,38 +1,115 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { ArrowRight, Bell, Home, PlayCircle, Plus, Shield, Settings, Headphones } from 'lucide-react'
-import SearchBar from '@/components/SearchBar'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { ArrowRight, Bell, Globe2, Home, Menu, PlayCircle, Plus, X } from 'lucide-react'
+import type { User } from '@/lib/api'
+import AuthModal, { type AuthSession } from '@/components/AuthModal'
+
+type SessionUser = Pick<User, 'id' | 'name' | 'email' | 'role'>
+
+type SessionState = { token?: string; user?: SessionUser }
 
 export default function AnfitrionesPage() {
-  const [destination, setDestination] = useState('')
-  const [checkIn, setCheckIn] = useState('')
-  const [checkOut, setCheckOut] = useState('')
-  const [showDatePicker, setShowDatePicker] = useState(false)
-  const [calendarMonth, setCalendarMonth] = useState(() => {
-    const today = new Date()
-    return new Date(today.getFullYear(), today.getMonth(), 1)
-  })
-  const [guestCounts, setGuestCounts] = useState({ adults: 0, children: 0, infants: 0, pets: 0 })
-  const [showGuests, setShowGuests] = useState(false)
+  const pathname = usePathname()
+  const [menu, setMenu] = useState(false)
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null)
+  const [showHostModal, setShowHostModal] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
 
-  const guests = useMemo(
-    () => guestCounts.adults + guestCounts.children,
-    [guestCounts]
-  )
+  useEffect(() => {
+    const readSession = () => {
+      try {
+        const rawSession = window.localStorage.getItem('genesis.session')
+        if (!rawSession) {
+          setSessionUser(null)
+          return
+        }
 
-  function handleSearch() {
-    const params = new URLSearchParams()
-    if (destination.trim()) params.set('city', destination.trim())
-    if (guests > 0) params.set('guests', String(guests))
-    if (checkIn) params.set('checkIn', checkIn)
-    if (checkOut) params.set('checkOut', checkOut)
-    window.location.href = `/alojamientos${params.toString() ? `?${params}` : ''}`
+        const session = JSON.parse(rawSession) as SessionState
+        setSessionUser(session?.user ?? null)
+      } catch {
+        setSessionUser(null)
+      }
+    }
+
+    readSession()
+    window.addEventListener('storage', readSession)
+
+    return () => window.removeEventListener('storage', readSession)
+  }, [])
+
+  const handlePublishClick = () => {
+    if (typeof window === 'undefined') return
+
+    const rawSession = window.localStorage.getItem('genesis.session')
+    if (!rawSession) {
+      window.location.href = '/?openAuth=1'
+      return
+    }
+
+    try {
+      const session = JSON.parse(rawSession) as { user?: { id?: string } }
+      if (!session?.user?.id) {
+        window.location.href = '/?openAuth=1'
+        return
+      }
+    } catch {
+      window.location.href = '/?openAuth=1'
+      return
+    }
+
+    setShowHostModal(true)
+  }
+
+  function saveSession(session: AuthSession) {
+    window.localStorage.setItem('genesis.session', JSON.stringify(session))
+    setSessionUser(session.user)
+    setAuthOpen(false)
+  }
+
+  function logout() {
+    window.localStorage.removeItem('genesis.session')
+    setSessionUser(null)
+    setMenu(false)
   }
 
   return (
     <main className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-4 lg:px-10">
+          <Link href="/" className="flex items-center gap-2" onClick={() => setMenu(false)}>
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary font-black text-primary-foreground">G</span>
+            <b className="text-xl tracking-tight">genesis<span className="text-primary">.</span></b>
+          </Link>
+          <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
+             <Link href="/" className={pathname === '/' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/' ? 'page' : undefined}>Inicio</Link>
+             <Link href="/alojamientos" className={pathname === '/alojamientos' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/alojamientos' ? 'page' : undefined}>Alojamientos</Link>
+             <Link href="/anfitriones" className={pathname === '/anfitriones' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/anfitriones' ? 'page' : undefined}>Para anfitriones</Link>
+          </nav>
+          <div className="relative flex items-center gap-2">
+            <button type="button" onClick={() => sessionUser ? setMenu(value => !value) : setAuthOpen(true)} className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-muted sm:block">
+              {sessionUser?.name || 'Iniciar sesión'}
+            </button>
+            <button type="button" aria-label="Cambiar idioma" className="flex size-10 items-center justify-center rounded-full border border-border">
+              <Globe2 size={17} />
+            </button>
+            <button type="button" aria-label="Abrir menú" aria-expanded={menu} onClick={() => setMenu(value => !value)} className="flex size-10 items-center justify-center rounded-full border border-border">
+              <Menu size={18} />
+            </button>
+            {menu && (
+              <div className="absolute right-0 top-12 w-56 rounded-2xl border border-border bg-card p-2 shadow-xl">
+                <button type="button" onClick={() => sessionUser ? logout() : setAuthOpen(true)} className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">{sessionUser ? 'Cerrar sesión' : 'Iniciar sesión'}</button>
+                <Link href="/anfitriones#como-funciona" onClick={() => setMenu(false)} className="block rounded-xl px-3 py-2 text-sm hover:bg-muted">Cómo funciona</Link>
+                <Link href="/alojamientos" onClick={() => setMenu(false)} className="block rounded-xl px-3 py-2 text-sm hover:bg-muted">Buscar alojamientos</Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onLogin={saveSession} />}
 
       {/* ── Hero con imagen de fondo ── */}
       <section className="relative flex min-h-[520px] flex-col items-center justify-center overflow-hidden px-5 py-20 text-center">
@@ -62,13 +139,14 @@ export default function AnfitrionesPage() {
 
           {/* CTAs */}
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/"
+            <button
+              type="button"
+              onClick={handlePublishClick}
               className="flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black hover:bg-white/90 transition-colors"
             >
               <Plus size={15} />
               Publicar ahora
-            </Link>
+            </button>
             <a
               href="#como-funciona"
               className="flex items-center gap-2 rounded-full border border-white/40 px-6 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors"
@@ -153,16 +231,80 @@ export default function AnfitrionesPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/"
+          <button
+            type="button"
+            onClick={handlePublishClick}
             className="flex shrink-0 items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <ArrowRight size={15} />
             Quiero ser anfitrión
-          </Link>
+          </button>
         </div>
       </div>
 
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:px-10">
+          <Link href="/" className="font-bold text-foreground">genesis.</Link>
+          <span>© 2026 Genesis Rentals</span>
+          <Link href="/anfitriones" className="font-medium text-foreground hover:text-primary">Convertite en anfitrión</Link>
+        </div>
+      </footer>
+
+      {showHostModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/40 p-5">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-3xl bg-card flex flex-col">
+            <div className="flex items-center justify-between border-b border-border px-6 py-5">
+              <div>
+                <p className="text-sm font-semibold text-primary">Para anfitriones</p>
+                <h2 className="mt-1 text-2xl font-semibold">Publicá tu espacio</h2>
+              </div>
+              <button type="button" onClick={() => setShowHostModal(false)} className="flex size-10 items-center justify-center rounded-full hover:bg-muted">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(90vh-88px)] overflow-y-auto px-6 py-6">
+              <div className="flex flex-col gap-5">
+                <label className="block text-sm font-medium">
+                  Título
+                  <input placeholder="Ej: Departamento moderno en el centro" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" />
+                </label>
+
+                <label className="block text-sm font-medium">
+                  Descripción
+                  <textarea placeholder="Describe tu alojamiento..." rows={4} className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" />
+                </label>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <label className="block text-sm font-medium">
+                    Ciudad
+                    <input placeholder="Ej: Buenos Aires" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" />
+                  </label>
+                  <label className="block text-sm font-medium">
+                    País
+                    <input placeholder="Ej: Argentina" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" />
+                  </label>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <label className="block text-sm font-medium">
+                    Precio por noche
+                    <input type="number" placeholder="Ej: 50000" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" />
+                  </label>
+                  <label className="block text-sm font-medium">
+                    Máximo de huéspedes
+                    <input type="number" placeholder="Ej: 4" className="mt-2 w-full rounded-xl border border-input bg-background px-4 py-3 outline-none" />
+                  </label>
+                </div>
+
+                <button type="button" onClick={() => setShowHostModal(false)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">
+                  Continuar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

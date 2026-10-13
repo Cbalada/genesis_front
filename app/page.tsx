@@ -5,6 +5,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Globe2, Heart, Menu, Pencil, Sta
 import { api, type AdminStats, type Booking, type Property, type PropertyType, type Review, type User, type UserRole } from '@/lib/api'
 import PropertyImageUploader from '@/components/PropertyImageUploader'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import SearchBar from '@/components/SearchBar'
 
 const fallback: Property[] = []
@@ -53,6 +54,7 @@ function upsertProperty(list: Property[], next: Property): Property[] {
 }
 
 export default function Page() {
+  const pathname = usePathname()
   const [properties, setProperties] = useState<Property[]>([])
   const [destination, setDestination] = useState('')
   const [category, setCategory] = useState('')
@@ -134,6 +136,24 @@ export default function Page() {
     setEditingProperty(property)
     setHost(true)
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('openAuth') === '1') {
+      setAuth(true)
+      params.delete('openAuth')
+      const next = params.toString()
+      const target = next ? `${window.location.pathname}?${next}` : window.location.pathname
+      window.history.replaceState({}, '', target)
+    }
+    if (params.get('openHost') === '1') {
+      setHost(true)
+      params.delete('openHost')
+      const next = params.toString()
+      const target = next ? `${window.location.pathname}?${next}` : window.location.pathname
+      window.history.replaceState({}, '', target)
+    }
+  }, [])
 
   useEffect(() => { restoreSession(); search(true) }, [])
   useEffect(() => { if (token) syncFavorites(token) }, [token])
@@ -228,9 +248,9 @@ export default function Page() {
             <b className="text-xl tracking-tight">genesis<span className="text-primary">.</span></b>
           </a>
           <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
-            <a href="#alojamientos" className="text-foreground">inicio</a>
-            <a href="/alojamientos">Alojamientos</a>
-            <a href="/anfitriones">Para anfitriones</a>
+            <a href="#inicio" className={pathname === '/' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/' ? 'page' : undefined}>inicio</a>
+            <a href="/alojamientos" className={pathname === '/alojamientos' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/alojamientos' ? 'page' : undefined}>Alojamientos</a>
+            <a href="/anfitriones" className={pathname === '/anfitriones' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/anfitriones' ? 'page' : undefined}>Para anfitriones</a>
           </nav>
           <div className="flex items-center gap-2">
             <button onClick={() => user ? setMenu(!menu) : setAuth(true)} className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-muted sm:block">

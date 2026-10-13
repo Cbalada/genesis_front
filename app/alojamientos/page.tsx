@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Globe2, Heart, Menu, Star, X } from 'lucide-react'
-import SearchBar from '@/components/SearchBar'
+import { usePathname } from 'next/navigation'
 import { api, type Property, type User } from '@/lib/api'
+import SearchBar, { type GuestCounts } from '@/components/SearchBar'
+import AuthModal, { type AuthSession } from '@/components/AuthModal'
 
 const fallback: Property[] = [
   { id:'1', title:'Casa de diseño frente al lago', city:'Villa La Angostura', country:'Argentina', pricePerNight:184, maxGuests:6, bedrooms:3, bathrooms:2, propertyType:'HOUSE', description:'Casa equipada para descansar frente al lago.', images:[{ imageUrl:'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1200&q=85', isCover:true }] },
@@ -27,11 +29,10 @@ const money = (value: string | number | undefined) => Number(value || 0).toLocal
 type Session = { token: string; user: User }
 
 export default function AlojamientosPage() {
+  const pathname = usePathname()
   const [properties, setProperties] = useState<Property[]>([])
   const [loadingProperties, setLoadingProperties] = useState(true)
   const [destination, setDestination] = useState('')
-  const [guestCounts, setGuestCounts] = useState({ adults: 0, children: 0, infants: 0, pets: 0 })
-  const [showGuests, setShowGuests] = useState(false)
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -39,29 +40,20 @@ export default function AlojamientosPage() {
     const today = new Date()
     return new Date(today.getFullYear(), today.getMonth(), 1)
   })
+  const [guestCounts, setGuestCounts] = useState<GuestCounts>({ adults: 0, children: 0, infants: 0, pets: 0 })
+  const [showGuests, setShowGuests] = useState(false)
+  const [busy, setBusy] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [menu, setMenu] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState('')
-  const [busy, setBusy] = useState('')
+  const [authOpen, setAuthOpen] = useState(false)
 
   const guests = useMemo(
-    () => (guestCounts.adults || 0) + (guestCounts.children || 0),
+    () => guestCounts.adults + guestCounts.children,
     [guestCounts]
   )
-
-  const visible = useMemo(() => {
-    const cleanDestination = destination.trim().toLowerCase()
-    return properties.filter((p) => {
-      const matchesDestination =
-        !cleanDestination ||
-        p.city.toLowerCase().includes(cleanDestination) ||
-        p.country.toLowerCase().includes(cleanDestination)
-
-      const matchesGuests = guests === 0 || p.maxGuests >= guests
-      return matchesDestination && matchesGuests
-    })
-  }, [destination, guests, properties])
+  const visible = useMemo(() => properties, [properties])
 
   useEffect(() => {
     restoreSession()
@@ -100,6 +92,28 @@ export default function AlojamientosPage() {
     }
   }
 
+  async function searchProperties() {
+    const query = new URLSearchParams({ page: '1', limit: '50' })
+    if (destination.trim()) query.set('city', destination.trim())
+    if (guests > 0) query.set('guests', String(guests))
+    if (checkIn && checkOut) {
+      query.set('checkIn', checkIn)
+      query.set('checkOut', checkOut)
+    }
+
+    setBusy('search')
+    setLoadingProperties(true)
+    try {
+      const result = await api.listProperties(query)
+      setProperties(result.data.filter((property) => property.status === 'ACTIVE'))
+    } catch {
+      setProperties([])
+    } finally {
+      setBusy('')
+      setLoadingProperties(false)
+    }
+  }
+
   async function syncFavorites(authToken: string) {
     try {
       const result = await api.favorites(authToken)
@@ -110,7 +124,7 @@ export default function AlojamientosPage() {
   }
 
   async function toggleFavorite(id: string) {
-    if (!user || !token) return
+    if (!user || !token) { setAuthOpen(true); return }
     const wasFavorite = favorites.includes(id)
     setFavorites((list) => (wasFavorite ? list.filter((x) => x !== id) : [...list, id]))
 
@@ -122,13 +136,19 @@ export default function AlojamientosPage() {
     }
   }
 
-  function setGuestsOnly(value: number) {
-    setGuestCounts((current) => ({ ...current, adults: Math.max(1, value) }))
+  function saveSession(session: AuthSession) {
+    setToken(session.token)
+    setUser(session.user)
+    localStorage.setItem(storageKey, JSON.stringify(session))
+    setAuthOpen(false)
   }
 
-  function handleSearch() {
-    setBusy('search')
-    setTimeout(() => setBusy(''), 200)
+  function logout() {
+    setToken('')
+    setUser(null)
+    setFavorites([])
+    localStorage.removeItem(storageKey)
+    setMenu(false)
   }
 
   return (
@@ -141,14 +161,14 @@ export default function AlojamientosPage() {
           </a>
 
           <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
-            <a href="/#inicio" className="text-foreground">inicio</a>
-            <a href="/alojamientos">Alojamientos</a>
-            <a href="/#anfitriones">Para anfitriones</a>
+            <a href="/#inicio" className={pathname === '/' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/' ? 'page' : undefined}>inicio</a>
+            <a href="/alojamientos" className={pathname === '/alojamientos' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/alojamientos' ? 'page' : undefined}>Alojamientos</a>
+            <a href="/anfitriones" className={pathname === '/anfitriones' ? 'text-foreground' : 'hover:text-foreground'} aria-current={pathname === '/anfitriones' ? 'page' : undefined}>Para anfitriones</a>
           </nav>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setMenu((current) => !current)}
+              onClick={() => user ? setMenu((current) => !current) : setAuthOpen(true)}
               className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-muted sm:block"
             >
               {user?.name || 'Iniciar sesión'}
@@ -165,9 +185,9 @@ export default function AlojamientosPage() {
 
             {menu && (
               <div className="absolute right-5 top-16 w-56 rounded-2xl border border-border bg-card p-2 shadow-xl">
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Iniciar sesión</button>
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Publicar alojamiento</button>
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Mis reservas</button>
+                <button onClick={() => user ? logout() : setAuthOpen(true)} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">{user ? 'Cerrar sesión' : 'Iniciar sesión'}</button>
+                <a href="/anfitriones" onClick={() => setMenu(false)} className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Publicar alojamiento</a>
+                <button onClick={() => { if (!user) setAuthOpen(true); setMenu(false) }} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Mis reservas</button>
                 {user?.role === 'ADMIN' && (
                   <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">Panel admin</button>
                 )}
@@ -175,7 +195,6 @@ export default function AlojamientosPage() {
             )}
           </div>
         </div>
-
         <SearchBar
           destination={destination}
           setDestination={setDestination}
@@ -193,9 +212,11 @@ export default function AlojamientosPage() {
           setShowGuests={setShowGuests}
           guests={guests}
           busy={busy}
-          onSearch={handleSearch}
+          onSearch={searchProperties}
         />
       </header>
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onLogin={saveSession} />}
 
       <section className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -218,7 +239,12 @@ export default function AlojamientosPage() {
                   </div>
                 </div>
               ))
-            : visible.map((property) => (
+            : visible.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-border px-6 py-12 text-center">
+                <p className="font-semibold">No encontramos alojamientos</p>
+                <p className="mt-2 text-sm text-muted-foreground">Probá con otro destino, menos viajeros o fechas diferentes.</p>
+              </div>
+            ) : visible.map((property) => (
             <article key={property.id} className="group cursor-pointer">
               <div className="relative overflow-hidden rounded-2xl bg-muted">
                 <img
